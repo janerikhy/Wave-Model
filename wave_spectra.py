@@ -34,6 +34,14 @@ class BaseSpectrum(ABC):
         return np.trapz(freq**n * spec, freq)
 
 
+    def realization(self, time, *args, **kwargs):
+        freq, spectrum = self.__call__(*args, **kwargs)
+        dw = freq[1]-freq[0]
+        amp = np.sqrt(2*spectrum*dw)
+        eps = np.random.uniform(0, 2*np.pi, size=len(amp))
+        return np.sum(amp * np.cos(freq*time[:, None] + eps), axis=1)
+
+
     @abstractclassmethod
     def _spectrum(self, omega, *args, **kwargs):
         raise NotImplementedError
@@ -81,9 +89,10 @@ class JONSWAP(ModifiedPiersonMoskowitz):
     def _b(self, tp):
         wp = 2*np.pi / tp
         sigma = self._sigma(wp)
-        return np.exp(-0.5 * (self._freq - wp)**2 / (sigma*wp))
+        return np.exp(-0.5 * ((self._freq - wp) / (sigma*wp))**2)
 
     def _sigma(self, wp):
+        # Set conditional parameter sigma used in JONSWAP spectrum.
         arg = self._freq <= wp
         sigma = np.empty_like(self._freq)
         sigma[arg] = 0.07
@@ -92,6 +101,7 @@ class JONSWAP(ModifiedPiersonMoskowitz):
 
 
 if __name__ == "__main__":
+    # Simple How-To for wave module
     import matplotlib.pyplot as plt
     plt.rcParams.update({
         'figure.figsize': (12, 4),
@@ -102,20 +112,36 @@ if __name__ == "__main__":
     hs = 2.5
     tp = 9.0
     wp = 2*np.pi / tp
-    gamma = 3.3
+    gamma = 2
 
     wmin = wp - wp/2
     wmax = 3*wp
-    N = 100
+    N = 1000
     w = np.linspace(wmin, wmax, N)
 
-    pm_spectrum = ModifiedPiersonMoskowitz(w)
-    jonswap_spectrum = JONSWAP(w)
+    pm_spectrum = ModifiedPiersonMoskowitz(w)       # Instantiate MPM spectrum object
+    jonswap_spectrum = JONSWAP(w)                   # Instantiate Jonwswap spectrum object
 
-    print(4*np.sqrt(jonswap_spectrum.moment(0, hs=hs, tp=tp)))
+    # Calculate the zero-moment for both spectra.
+    m0_jonswap = jonswap_spectrum.moment(n=0, hs=hs, tp=tp, gamma=gamma)
+    m0_pm = pm_spectrum.moment(n=0, hs=hs, tp=tp)
+
+    print(f"JONSWAP: Hs = {4*np.sqrt(m0_jonswap):.2f} [m]")
+    print(f"PM: Hs = {4*np.sqrt(m0_pm):.2f} [m]")
     
     plt.plot(*pm_spectrum(hs, tp), label="PM")
     plt.plot(*jonswap_spectrum(hs, tp, gamma), label="JONSWAP")
     plt.grid()
     plt.legend()
+    plt.show()
+
+    time = np.arange(0, 500, 0.1)
+
+    jonswap_realizatin = jonswap_spectrum.realization(time, hs=hs, tp=tp, gamma=gamma)
+    pm_realizatino = pm_spectrum.realization(time, hs=hs, tp=tp)
+
+    plt.plot(time, pm_spectrum.realization(time, hs=hs, tp=tp))
+    plt.plot(time, jonswap_spectrum.realization(time, hs=hs, tp=tp, gamma=gamma))
+    plt.xlim(time[0], time[-1])
+    plt.ylim(-6*np.sqrt(m0_jonswap), 6*np.sqrt(m0_jonswap))
     plt.show()
