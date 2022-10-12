@@ -35,6 +35,24 @@ class BaseSpectrum(ABC):
 
 
     def realization(self, time, *args, **kwargs):
+        """
+        Generate a wave realization from wave spectrum at a fixed position.
+
+        Parameters
+        ----------
+        time : 1D-array
+            Array of time points used in realization
+        *args : tuple
+            Additional arguments should be passed as keyword arguments
+        **kwargs : dict
+            Wave spectrum parameters like hs and tp, include gamma for JONSWAP wave spectrum.
+        
+        Return
+        ------
+        timeseries : 1D-array
+            Array of wave elevation at different time instances for a fixed point (x=0).
+        """
+        
         freq, spectrum = self.__call__(*args, **kwargs)
         dw = freq[1]-freq[0]
         amp = np.sqrt(2*spectrum*dw)
@@ -59,6 +77,26 @@ class BasePMSpectrum(BaseSpectrum):
 class ModifiedPiersonMoskowitz(BasePMSpectrum):
 
     def __call__(self, hs, tp, freq_hz=None):
+        """
+        Generate a Modified Pierson-Moskowitz wave spectrum.
+
+        Parameters
+        ----------
+        hs : float
+            Significant wave height
+        tp : float
+            Peak period of wave spectrum
+        freq_hz : bool
+            Wave spectrum and frequencies in Hz or rad/s.
+
+        Return
+        ------
+        freq : 1D-array
+            Array of frequencies in wave spectrum
+        spectrum : 1D-array
+            1D Modified Pierson-Moskowitz wave spectrum
+        """
+
         A = self._A(hs, tp)
         B = self._B(tp)
 
@@ -76,6 +114,28 @@ class ModifiedPiersonMoskowitz(BasePMSpectrum):
 class JONSWAP(ModifiedPiersonMoskowitz):
 
     def __call__(self, hs, tp, gamma=1, freq_hz=None):
+        """
+        Generate a JONSWAP wave spectrum.
+
+        Parameters
+        ----------
+        hs : float
+            Significant wave heihgt
+        tp : float
+            Peak period of wave spectrum
+        gamma : float
+            Steapness factor
+        freq_hz : bool, default=False
+            Frequency in Hz or rad/s
+
+        Return
+        ------
+        freq : 1D-array
+            Frequencies of wave spectrum
+        spectrum : 1D-array
+            1D JONSWAP wave spectrum
+        """
+
         freq, pm_spectrum = super().__call__(hs, tp, freq_hz=freq_hz)
 
         alpha = self._alpha(gamma)
@@ -102,6 +162,8 @@ class JONSWAP(ModifiedPiersonMoskowitz):
 
 if __name__ == "__main__":
     # Simple How-To for wave module
+    import doctest
+    doctest.testmod()
     import matplotlib.pyplot as plt
     plt.rcParams.update({
         'figure.figsize': (12, 4),
