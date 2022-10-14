@@ -17,3 +17,46 @@ def polar_to_complex(amp, theta):
 
 def pipi(theta):
     return np.mod(theta + np.pi, 2*np.pi) - np.pi
+
+
+def Rx(phi):
+    return np.array([
+        [1, 0, 0],
+        [0, np.cos(phi), -np.sin(phi)],
+        [0, np.sin(phi), np.cos(phi)]
+    ])
+
+
+def Ry(theta):
+    return np.array([
+        [np.cos(theta), 0, np.sin(theta)],
+        [0, 1, 0],
+        [-np.sin(theta), 0, np.cos(theta)]
+    ])
+
+
+def Rz(psi):
+    return np.array([
+        [np.cos(psi), -np.sin(psi), 0],
+        [np.sin(psi), np.cos(psi), 0],
+        [0, 0, 1]
+    ])
+
+
+def Rzyx(psi, theta, phi):
+    return Rz(psi)@Ry(theta)@Rx(phi)
+
+
+def Tzyx(psi, theta, phi):
+    return np.array([
+        [1, np.sin(phi)*np.tan(theta), np.cos(phi)*np.tan(theta)],
+        [0, np.cos(phi), -np.sin(phi)],
+        [0, np.sin(phi)/np.cos(theta), np.cos(phi)/np.cos(theta)]
+    ])
+
+
+def J(psi, theta, phi):
+    return np.block([
+        [Rzyx(psi, theta, phi), np.zeros((3, 3))],
+        [np.zeros((3, 3)), Tzyx(psi, theta, phi)]
+    ])
