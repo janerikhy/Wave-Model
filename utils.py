@@ -1,5 +1,6 @@
 # Utility functions
 import numpy as np
+from time import time
 
 
 def complex_to_polar(complex_values):
@@ -60,3 +61,16 @@ def J(psi, theta, phi):
         [Rzyx(psi, theta, phi), np.zeros((3, 3))],
         [np.zeros((3, 3)), Tzyx(psi, theta, phi)]
     ])
+
+
+def timeit(func):
+    """
+    Decorator for measuring execution time of function.
+    """
+    def wrapper(*args, **kwargs):
+        t1 = time()
+        results = func(*args, **kwargs)
+        t2 = time()
+        print(f"Execution time of {func.__name__}: {(t2 - t1):.4f}")
+        return results
+    return wrapper

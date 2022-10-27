@@ -1,16 +1,6 @@
 # Module for computing wave loads on vessel
 import numpy as np
-from time import time
-
-def timeit(func):
-    def wrapper(*args, **kwargs):
-        t1 = time()
-        results = func(*args, **kwargs)
-        t2 = time()
-        print(f"Execution time of {func.__name__}: {(t2 - t1):.4f}")
-        return results
-    return wrapper
-
+from utils import timeit
 
 class WaveLoad:
     """
