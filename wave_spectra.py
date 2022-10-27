@@ -355,7 +355,7 @@ if __name__ == "__main__":
     ax.set_ylabel(r"$\psi \; [deg]$")
     plt.show()
 
-    Nxy = 200
+    Nxy = 400
     x = np.linspace(-150, 150, Nxy)
     y = np.linspace(-150, 150, Nxy)
     X, Y, realization_2d = dir_spectra.wave_realization(0, x, y)
