@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 from wave_spectra import ModifiedPiersonMoskowitz, JONSWAP
+from wave_spreading import MultiDirectional, MultiDirectionalAlt
 
 
 class TestSpectra:
@@ -52,3 +53,31 @@ class TestSpectra:
         pm_spectrum = ModifiedPiersonMoskowitz(freqs)
 
         assert np.all(np.isclose(jonswap_spectrum(hs, tp, gamma), pm_spectrum(hs, tp), rtol=1e-1))
+    
+    
+    def test_area_spreading_function(self):
+        # Verify that the integral of the spreading function equals to 1
+        N = 100
+        theta_min, theta_max = -np.pi, np.pi
+        theta = np.linspace(theta_min, theta_max, N)
+
+        spreading_spectra = MultiDirectional(theta)
+        angles, spreading = spreading_spectra()
+
+        integral = np.trapz(spreading, angles)
+        print(integral)
+        assert np.isclose(integral, 1, rtol=1e-2)
+
+    def test_area_spreading_function_alt(self):
+        N = 100
+        theta_min, theta_max = -np.pi, np.pi
+        theta = np.linspace(theta_min, theta_max, N)
+        theta0 = np.pi/4
+        s=2
+
+        spreading_spectra = MultiDirectionalAlt(theta)
+        angles, spreading = spreading_spectra(theta0, s)
+
+        integral = np.trapz(spreading, angles)
+        print(integral)
+        assert np.isclose(integral, 1, rtol=1e-2)
