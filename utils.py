@@ -63,6 +63,25 @@ def J(psi, theta, phi):
     ])
 
 
+def Smat(x):
+    """
+    Skew-symmetric cross-product operator matrix.
+
+    Parameters
+    ----------
+    x: 3x1-array
+
+    Return
+    ------
+    S: 3x3-array
+    """
+    return np.array([
+        [0, -x[2], x[1]],
+        [x[2], 0, -x[0]],
+        [-x[1], x[0], 0]
+    ])
+
+
 def timeit(func):
     """
     Decorator for measuring execution time of function.
