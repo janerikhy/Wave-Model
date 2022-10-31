@@ -9,6 +9,9 @@ import os
 cwd = os.getcwd()
 sys.path.insert(0, cwd)
 
+print(cwd)
+print(sys.path)
+
 from wave_spectra import DirectionalSpectrum, JONSWAP
 
 # Set plot parameters
@@ -76,26 +79,5 @@ ax2 = fig.add_subplot(122, projection="3d")
 ax2.view_init(40, 40)
 ax2.plot_surface(X, Y, wave_elevation, cmap=cm.coolwarm)
 ax2.set_zlim(-1.5*hs, 1.5*hs)
-
-plt.show()
-
-# Create an animation of waves
-
-fps = 32        # frames per second
-duration = 30   # seconds
-
-def update_plot(t, plot, x, y):
-    plot[0].remove()
-    _,_, wave = dir_spectrum.wave_realization(t, x, y)
-    plot[0] = ax.plot_surface(X, Y, wave, cmap=cm.coolwarm)
-
-from matplotlib.animation import FuncAnimation
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection="3d")
-
-plot = [ax.plot_surface(X, Y, wave_elevation, cmap=cm.coolwarm)]
-
-anim = FuncAnimation(fig, update_plot, frames=np.linspace(0, duration, (duration*fps)), fargs=(plot, x, y,))
 
 plt.show()

@@ -1,5 +1,12 @@
 import numpy as np
 import pytest
+
+import sys
+import os
+
+cwd = os.getcwd()
+sys.path.insert(0, cwd)
+
 from wave_spectra import ModifiedPiersonMoskowitz, JONSWAP
 from wave_spreading import MultiDirectional, MultiDirectionalAlt
 

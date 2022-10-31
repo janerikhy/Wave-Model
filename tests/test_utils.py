@@ -1,6 +1,12 @@
 import numpy as np
 import pytest
 
+import sys
+import os
+
+cwd = os.getcwd()
+sys.path.insert(0, cwd)
+
 from utils import Rz, Ry, Rx, Rzyx, J
 
 
