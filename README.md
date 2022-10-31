@@ -29,6 +29,7 @@ To ensure that the correct base directory `some\\path\\Wave-Model` can be found 
 
 ```
 wavemodel.pth
+-------------
 
 c:\Users\your_user\full_path\Wave-Model
 ```
