@@ -45,6 +45,7 @@ class WaveLoad:
         self._W = np.empty((self._N, self._N))
         self._P = np.empty_like(self._W)
         self._Q = np.empty((dof, len(self._angles), self._N, self._N))
+        self._forceRAO = np.empty(10)   # Just set random right know.
 
 
     def _set_force_raos(self):
@@ -55,7 +56,19 @@ class WaveLoad:
         """
         pass
     
-    def first_order_loads(self, *args, **kwargs):
+    def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
+        """
+        Calculate first order wave-loads by super position of 
+        wave load from each individual wave component.
+
+        (Assumption: The force RAO amplitude and phase is known).
+        """
+        # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
+        rel_angle = heading - self._angles
+        heading_index = np.argmin(np.abs(rao_angles - rel_angle))
+
+        # forceRAOs = self._forceRAO[dof, [heading_index], ]
+
         pass
 
     def second_order_loads(self, t, rel_angle, *args, **kwargs):

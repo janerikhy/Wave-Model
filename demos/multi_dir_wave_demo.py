@@ -12,7 +12,7 @@ sys.path.insert(0, cwd)
 print(cwd)
 print(sys.path)
 
-from wave_spectra import DirectionalSpectrum, JONSWAP
+from waves.wave_spectra import DirectionalSpectrum, JONSWAP
 
 # Set plot parameters
 plt.rcParams.update({

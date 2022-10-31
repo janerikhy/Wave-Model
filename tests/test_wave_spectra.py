@@ -7,8 +7,8 @@ import os
 cwd = os.getcwd()
 sys.path.insert(0, cwd)
 
-from wave_spectra import ModifiedPiersonMoskowitz, JONSWAP
-from wave_spreading import MultiDirectional, MultiDirectionalAlt
+from waves.wave_spectra import ModifiedPiersonMoskowitz, JONSWAP
+from waves.wave_spreading import MultiDirectional, MultiDirectionalAlt
 
 
 class TestSpectra:
