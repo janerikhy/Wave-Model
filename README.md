@@ -5,7 +5,15 @@ Wave model simulator used in master project and master thesis
 ## Previous work
 The simulator will be based on the work of ...... and Brørby 2021/2022. 
 
-### TIPS
+## Tips
+
+### Setup virtual environment and install dependencies
+
+Create a virtual environment e.g `py -m venv name-of-venv`.
+
+Install required dependencies by running: `pip install -r requirements.txt`
+
+### Relative Imports
 
 When running different scripts you might encounter problems due to relative imports of packages/modules. This will typically be "No module named wave_spectra" etc. 
 This has to do with how python looks for modules. 
