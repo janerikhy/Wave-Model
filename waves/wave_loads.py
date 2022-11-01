@@ -68,6 +68,7 @@ class WaveLoad:
         heading_index = np.argmin(np.abs(rao_angles - rel_angle))
 
         # forceRAOs = self._forceRAO[dof, [heading_index], ]
+        # HARALD KODER
 
         pass
 
