@@ -1,5 +1,6 @@
 # Module for computing wave loads on vessel
 import numpy as np
+import json
 from utils import timeit
 
 class WaveLoad:
@@ -31,20 +32,26 @@ class WaveLoad:
         Vessel force RAO phase for the given wave frequencies _freq.
     """
 
-    def __init__(self, wave_amps, freqs, eps, angles, vessel_params, rho=1025, g=9.81, dof=6):
+    def __init__(self, wave_amps, freqs, eps, angles, config_file, rho=1025, g=9.81, dof=6):
+        with open(config_file, 'r') as f:
+            vessel_params = json.load(f)
         self._N = wave_amps.shape[0]
         self._amp = wave_amps
         self._freqs = freqs
         self._eps = eps
         self._angles = angles
+        self._qtf_angles = np.asarray(vessel_params['headings'])
         self._params = vessel_params
         # self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
         self._g = g
         self._rho = rho
-        self._A = np.empty(self._N)
-        self._W = np.empty((self._N, self._N))
-        self._P = np.empty_like(self._W)
-        self._Q = np.empty((dof, len(self._angles), self._N, self._N))
+        self._W = freqs[:, None] - freqs
+        self._P = eps[:, None] - eps
+        self._Q = self._full_qtf_6dof(
+            np.asarray(vessel_params['headings']),
+            np.asarray(vessel_params['freqs']),
+            np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0]
+        )
         self._forceRAO = np.empty(10)   # Just set random right know.
 
 
@@ -71,7 +78,7 @@ class WaveLoad:
 
         pass
 
-    def second_order_loads(self, t, rel_angle, *args, **kwargs):
+    def second_order_loads(self, t, rel_angle):
         """
         Calcualation of second order drift loads.
 
@@ -86,13 +93,14 @@ class WaveLoad:
         # Implementation - currently for only 1 DOF
 
         # Get the QTF matrix for the given heading.
-        heading_index = np.argmin(np.abs(self._angles - rel_angle))
-        Q = self._Q[heading_index]
+        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
+        print(f"Indx: {heading_index}, Relative angle: {self._qtf_angles[heading_index]}")
+        Q = self._Q[:, heading_index, :, :]
 
-        tau_sv = self._A.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._A
+        tau_sv = np.zeros(6)
+        for i in [0, 1, 5]:
+            tau_sv[i] = np.real(self._amp.T@ (Q[i]*np.exp(self._W*(1j*t) + 1j*self._P)) @ self._amp)
         return tau_sv
-
-        
 
 
     @timeit
@@ -166,6 +174,9 @@ class WaveLoad:
         Generate the full QTF matrix for all DOF, all headings with calculated QTF
         and for all wave frequency components.
 
+        VERES ONLY CALCULATES DRIFT FORCES FROM SURGE SWAY AND YAW. THEREFOR THE REMAINING
+        DOFs WILL NOT REQUIRE QTF AND WILL BE SET TO ZERO.
+
         Parameters
         ----------
         qtf_headings : 1D-array
@@ -185,6 +196,7 @@ class WaveLoad:
         """
         
         freq_indices = [np.argmin(np.abs(qtf_freqs - freq)) for freq in self._freqs]
+        print(len(freq_indices))
         Q = np.zeros((6, len(qtf_headings), self._N, self._N))
 
         for dof in range(6):
@@ -192,5 +204,10 @@ class WaveLoad:
             for i in range(len(qtf_headings)):
                 if method == "Newman":
                     Q[dof, i] = 0.5*(Qdiag[0, :, i, None] + Qdiag[0, :, i])
+        
+        # From config file, qtf[2] is yaw - not heave. Changing this here.
+        temp = Q[2]
+        Q[5] = Q[2]
+        Q[2] = np.zeros_like(Q[0])
         return Q
         
