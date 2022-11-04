@@ -4,7 +4,7 @@ import os
 import json
 
 from simulator.vessel import Vessel
-from utils import Smat, Rz
+from utils import Smat, Rz, J
 
 """
 Vessel models for C/S Arctic Drillship.
@@ -60,6 +60,49 @@ class CSADMan3DOF(Vessel):
 
         eta_dot = Rz(self._eta[2])@self._nu
         nu_dot = self._Minv@(tau - self._Bv@nu_r - self._D@nu_r + self._Ma@dnu_c)
+        self._x_dot = np.concatenate([eta_dot, nu_dot])
+
+
+class CSAD_DP_6DOF(Vessel):
+    """6 DOF DP simulator model for CSAD.
+    
+    Simulator model for DP and low-speed applications.
+    Zero-speed is assumed. 
+
+    No fluid memory effects are included yet.
+    """
+
+    def __init__(self, dt, *args, config_file="vessel_json.json", dof=6, **kwargs):
+        config_file = os.path.join(DATA_DIR, config_file)
+        super().__init__(dt, config_file, dof=6)
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+        
+        self._Mrb = np.asarray(data['MRB'])         # Rigid body mass matrix
+        self._Ma = np.asarray(data['A'])[:, :, 40]  # Added mass matrix
+        self._M = self._Mrb + self._Ma              # Total mass matrix
+        self._Minv = np.linalg.inv(self._M)         # Inverse mass matrix
+
+        self._Dp = np.asarray(data['B'])[:, :, 40]  # Potential damping
+        self._Dv = np.asarray(data['Bv'])           # Viscous damping
+        self._D = self._Dp + self._Dv               # Total damping
+        self._D[3, 3] *= 2                          # Increase roll damping
+
+        self._G = np.asarray(data['C'])[:, :, 0]    # Restoring coefficients  
+
+    def x_dot(self, Uc, betac, tau):
+        eta = self.get_eta()
+        nu = self.get_nu()
+
+        nu_cn = Uc*np.array([np.cos(betac), np.sin(betac)])
+        nu_cn = np.concatenate([nu_cn, np.zeros(4)])
+        Jinv = np.linalg.inv(J(eta))
+        nu_c = Jinv@nu_cn
+
+        nu_r = nu - nu_c
+        eta_dot = J(eta)@nu
+
+        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@Jinv@eta)
         self._x_dot = np.concatenate([eta_dot, nu_dot])
 
 
