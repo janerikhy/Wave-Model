@@ -44,11 +44,17 @@ def Rz(psi):
     ])
 
 
-def Rzyx(psi, theta, phi):
+def Rzyx(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
     return Rz(psi)@Ry(theta)@Rx(phi)
 
 
-def Tzyx(psi, theta, phi):
+def Tzyx(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
     return np.array([
         [1, np.sin(phi)*np.tan(theta), np.cos(phi)*np.tan(theta)],
         [0, np.cos(phi), -np.sin(phi)],
@@ -56,10 +62,33 @@ def Tzyx(psi, theta, phi):
     ])
 
 
-def J(psi, theta, phi):
+def J(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
+
     return np.block([
-        [Rzyx(psi, theta, phi), np.zeros((3, 3))],
-        [np.zeros((3, 3)), Tzyx(psi, theta, phi)]
+        [Rzyx(eta), np.zeros((3, 3))],
+        [np.zeros((3, 3)), Tzyx(eta)]
+    ])
+
+
+def Smat(x):
+    """
+    Skew-symmetric cross-product operator matrix.
+
+    Parameters
+    ----------
+    x: 3x1-array
+
+    Return
+    ------
+    S: 3x3-array
+    """
+    return np.array([
+        [0, -x[2], x[1]],
+        [x[2], 0, -x[0]],
+        [-x[1], x[0], 0]
     ])
 
 
