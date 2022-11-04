@@ -9,7 +9,12 @@ import pickle
 import os
 
 GUNNERUS_DATA = os.path.abspath(
-    os.path.join(os.getcwd(), os.pardir, 'vessel_data', 'gunnerus')
+    os.path.join(
+        os.path.dirname(__file__),
+        os.pardir,
+        'vessel_data',
+        'gunnerus'
+    )
 )
 
 
@@ -67,38 +72,3 @@ class GunnerusManeuvering3DoF(Vessel):
             [0, 0, M[0, 0]*nu[0]],
             [M[1, 1]*nu[1] + .5*(M[1, 2] + M[2, 1])*nu[2], -M[0, 0]*nu[0], 0]
         ])
-
-
-class GunnerusDP3Dof(Vessel):
-    """
-    3DOF DP Model for R/V Gunnerus. The model is valid for stationkeeping and low-speed
-    maneuvering up to approx. 2 m/s. 
-
-    eta_dot = R(psi)*nu
-    M*nu_dot + C_rb(nu) + N(nu_r)nu_r = tau + tau_wind + tau_wave
-
-    where N(nu_r)nu_r := C_A(nu_r)nu_r + D(nu_r)nu_r
-
-    states: 
-        nu = [u, v, r]^T
-        eta = [N, E, psi]^T
-
-    M = np.array([
-        [m - X_udot, 0, 0],
-        [0, m - Y_vdot, m*x_g - Y_rdot],
-        [0, m*x_g - Y_rdot, Iz - N_rdot]
-    ]),
-
-    C_rb(nu) = np.array([
-        [0, 0, -m(x_g*r + v)],
-        [0, 0, m*u],
-        [m(x_g*r + v), -m*u, 0]
-    ])
-
-    """
-    # CONFIG_FILE = "parV_RVG3DOF.pkl"
-
-    # def __init__(self, *args, **kwargs):
-    #     with open(CONFIG_FILE, 'rb') as f:
-    #         self.data = pickle.read(f)
-    #     self._Mrb = 
