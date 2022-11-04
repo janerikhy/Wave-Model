@@ -43,7 +43,7 @@ class Vessel(ABC):
 
     def integrate(self):
         self._x = self._x + self._dt * self._x_dot
-        print(self._x[:self._dof])
         self._eta = self._x[:self._dof]
+        self._eta[self._dof//6+2:] = pipi(self._eta[self._dof//6+2:])
         self._nu = self._x[self._dof:]
 
