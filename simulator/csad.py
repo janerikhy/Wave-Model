@@ -69,6 +69,7 @@ class CSAD_DP_6DOF(Vessel):
     Simulator model for DP and low-speed applications.
     Zero-speed is assumed. 
 
+    No fluid memory effects are included yet.
     """
 
     def __init__(self, dt, *args, config_file="vessel_json.json", dof=6, **kwargs):
@@ -77,21 +78,17 @@ class CSAD_DP_6DOF(Vessel):
         with open(config_file, 'r') as f:
             data = json.load(f)
         
-        self._Mrb = np.asarray(data['MRB'])
-        self._Ma = np.asarray(data['A'])[:, :, 40]
-        self._M = self._Mrb + self._Ma
-        self._Minv = np.linalg.inv(self._M)
+        self._Mrb = np.asarray(data['MRB'])         # Rigid body mass matrix
+        self._Ma = np.asarray(data['A'])[:, :, 40]  # Added mass matrix
+        self._M = self._Mrb + self._Ma              # Total mass matrix
+        self._Minv = np.linalg.inv(self._M)         # Inverse mass matrix
 
-        self._Dp = np.asarray(data['B'])[:, :, 40]   # Potential damping
+        self._Dp = np.asarray(data['B'])[:, :, 40]  # Potential damping
         self._Dv = np.asarray(data['Bv'])           # Viscous damping
-        self._D = self._Dp + self._Dv
-        self._D[3, 3] *= 2
+        self._D = self._Dp + self._Dv               # Total damping
+        self._D[3, 3] *= 2                          # Increase roll damping
 
         self._G = np.asarray(data['C'])[:, :, 0]    # Restoring coefficients  
-
-        # Damping is way to low in roll - therefore we use the following estimate
-        # self._D[3, 3] = 2*np.sqrt(self._M[3, 3]*self._G[3, 3])*0.36
-
 
     def x_dot(self, Uc, betac, tau):
         eta = self.get_eta()
@@ -104,7 +101,7 @@ class CSAD_DP_6DOF(Vessel):
 
         nu_r = nu - nu_c
         eta_dot = J(eta)@nu
-        # nu_dot = self._Minv@(tau - np.diag(np.ones(6)*1.53)@nu_r - self._G@Jinv@eta)
+
         nu_dot = self._Minv@(tau - self._D@nu_r - self._G@Jinv@eta)
         self._x_dot = np.concatenate([eta_dot, nu_dot])
 
