@@ -45,7 +45,8 @@ class WaveLoad:
         self._W = np.empty((self._N, self._N))
         self._P = np.empty_like(self._W)
         self._Q = np.empty((dof, len(self._angles), self._N, self._N))
-        self._forceRAO = []
+        self._forceRAOamp = []
+        self._forceRAOphase = []
         # må man kalle set_force funkjsonen?
 
 
@@ -55,15 +56,18 @@ class WaveLoad:
         of 1st and second order wave loads. 
         Selected for the wave frequencies of the sea state by closest index.
         """
-        num_freq = len(self._params['forceRAO']['amp'][0])
         num_dir = len(self._params['forceRAO']['amp'][0][0])
 
         for i in range(self._dof):
-            RAO = np.empty((num_freq, num_dir))
-            for j in range(num_freq):
+            RAOamp = np.empty((self._N, num_dir))
+            RAOphase = np.empty((self._N, num_dir))
+            for j in range(self._N):
+                freq_index = np.argmin(np.abs(self._params['forceRAO']['w']-self._freqs[j]))
                 for k in range(num_dir):
-                    RAO[j][k] = self._params['forceRAO']['amp'][i][j][k][0]
-            self._forceRAO.append(RAO)
+                    RAOamp[j][k] = self._params['forceRAO']['amp'][i][freq_index][k][0]
+                    RAOphase[j][k] = self._params['forceRAO']['amp'][i][freq_index][k][0]
+            self._forceRAOamp.append(RAOamp)
+            self._forceRAOphase.append(RAOphase)
     
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
