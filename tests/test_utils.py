@@ -26,24 +26,27 @@ class TestKinematicUtils:
     def test_Rzyx(self):
         psi, theta, phi = np.pi / 2, 0, 0
         nu = np.array([1., 0., 0.])
+        eta = np.array([0, 0, 0, phi, theta, psi])
 
         # Expected true value
         eta_dot = np.array([0., 1., 0.])
 
-        assert np.all(np.isclose(eta_dot, Rzyx(phi, theta, psi)@nu, rtol=1e-6))
+        assert np.all(np.isclose(eta_dot, Rzyx(eta)@nu, rtol=1e-6))
 
 
     def test_J_dim(self):
         psi, theta, phi = 0, 0, 0
-        rotmat_6dof = J(psi, theta, phi)
+        eta = np.array([0, 0, 0, phi, theta, psi])
+
+        rotmat_6dof = J(eta)
 
         assert np.all(np.equal((6, 6), rotmat_6dof.shape))
 
     def test_J(self):
         nu = np.array([1., 0., 0., 0., 0., 0.])
         phi, theta, psi = 0., 0., np.pi/2
+        eta = np.array([0, 0, 0, phi, theta, psi])
+
         eta_dot = np.array([0., 1., 0., 0., 0., 0.])
-
-        print(J(phi, theta, psi)@nu)
-
-        assert np.all(np.isclose(eta_dot, J(phi, theta, psi)@nu, rtol=1e-6))
+        
+        assert np.all(np.isclose(eta_dot, J(eta)@nu, rtol=1e-6))
