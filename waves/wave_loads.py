@@ -48,6 +48,8 @@ class WaveLoad:
         self._Q = np.empty((dof, len(self._angles), self._N, self._N))
         self._forceRAO = np.empty(10)   # Just set random right know.
         self._dof = dof
+        self._forceRAOamp = []
+        self._forceRAOphase = []
 
     def _set_force_raos(self):
         """
@@ -65,35 +67,37 @@ class WaveLoad:
         (Assumption: The force RAO amplitude and phase is known. Uni-directional, long-crested waves.).
         ------------------
         Input arguments:
-            t: time
+            t: time d
             heading: Scalar angle in NED-frame describing the orientation of the vessel
-            rao_angles: 
+            rao_angles: List of all angles with data in the RAOs
 
         """
-        # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
+        # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE, AND CALCULATE HEADING INDEX
         rel_angle = heading - self._angles
         heading_index = np.argmin(np.abs(rao_angles - rel_angle))
 
         # Allocate memory
-        tau_wf = np.zeros(len(self._dof))
+        tau_wf = np.zeros(self._dof)
 
         # Should probably implement this better. only compatible for 3 and 6 DOF atm
         if self._dof == 3:
-            dof = [0, 1, 5]
+            dofs = [0, 1, 5]
         else:   # _dof = 6
-            dof = [0,1,2,3,4,5]
+            dofs = [0,1,2,3,4,5]
 
-        for i in dof:  
+        count = 0
+        for dof in dofs:  
             
             # Extract columns with correct heading from the Linear Transfer Functions
-            LTF_amp = self._forceRAO[i][:][heading_index]   # Order of indexes to be synced with Marie
-            LTF_phase = self._forceRAO[i][:][heading_index] 
+            LTF_amp = self._forceRAOamp[dof][:][heading_index]   # Order of indexes to be synced with Marie
+            LTF_phase = self._forceRAOphase[dof][:][heading_index] 
 
-            tau_wf[i] = np.sum(self._A * LTF_amp * np.exp(1j*(self._freqs * t  + LTF_phase + self._eps)))
-        
+            tau_wf[count] = np.sum(np.real(self._A * LTF_amp * np.exp(1j*(self._freqs * t  + LTF_phase + self._eps)))) # No (position arg)
+            count +=1
+
         return tau_wf
 
-    def second_order_loads(self, t, rel_angle, *args, **kwargs):
+    def second_order_loads(self, t, heading, *args, **kwargs):
         """
         Calcualation of second order drift loads.
 
@@ -105,13 +109,27 @@ class WaveLoad:
         [Newman 1974] INSERT HER
         [Standing, Brendling and Wilson]
         """
-        # Implementation - currently for only 1 DOF
+        # Implementation
 
-        # Get the QTF matrix for the given heading.
+         # Calculate relative wave angle and heading index in QTF
+        rel_angle = heading - self._angles
         heading_index = np.argmin(np.abs(self._angles - rel_angle))
-        Q = self._Q[heading_index]
+        
+        tau_sv = np.zeros(self._dof)
 
-        tau_sv = self._A.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._A # Missing real value here?
+        # Should probably implement this better. only compatible for 3 and 6 DOF atm
+        if self._dof == 3:
+            dofs = [0, 1, 5]
+        else:   # _dof = 6
+            dofs = [0,1,2,3,4,5]
+        
+        count = 0
+        for dof in dofs:
+            Q = self._Q[dof][:][:][heading_index]  # Extract Q-matrix with all QTFs for a given heading and dof
+
+            tau_sv[count] = np.sum( np.real( self._A.T @ (Q * np.exp(1j*(self._W*t + self._P))) @ self._A ))
+
+        #tau_sv = self._A.T@ (Q*np.exp(self._W*(1j*t) + self._P)) @ self._A # Missing real value here?
         return tau_sv
 
         
