@@ -32,6 +32,7 @@ class WaveLoad:
     """
 
     def __init__(self, wave_amps, freqs, eps, angles, vessel_params, rho=1025, g=9.81, dof=6):
+        # From sea state
         self._N = wave_amps.shape[0]
         self._amp = wave_amps
         self._freqs = freqs
@@ -46,7 +47,7 @@ class WaveLoad:
         self._P = np.empty_like(self._W)
         self._Q = np.empty((dof, len(self._angles), self._N, self._N))
         self._forceRAO = np.empty(10)   # Just set random right know.
-
+        self._dof = dof
 
     def _set_force_raos(self):
         """
@@ -56,21 +57,41 @@ class WaveLoad:
         """
         pass
     
-    def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
+    def first_order_loads(self, t, heading, rao_angles, **kwargs):
         """
         Calculate first order wave-loads by super position of 
         wave load from each individual wave component.
 
-        (Assumption: The force RAO amplitude and phase is known).
+        (Assumption: The force RAO amplitude and phase is known. Uni-directional, long-crested waves.).
+        ------------------
+        Input arguments:
+            t: time
+            heading: Scalar angle in NED-frame describing the orientation of the vessel
+            rao_angles: 
+
         """
         # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
         rel_angle = heading - self._angles
         heading_index = np.argmin(np.abs(rao_angles - rel_angle))
 
-        # forceRAOs = self._forceRAO[dof, [heading_index], ]
-        # HARALD KODER
+        # Allocate memory
+        tau_wf = np.zeros(len(self._dof))
 
-        pass
+        # Should probably implement this better. only compatible for 3 and 6 DOF atm
+        if self._dof == 3:
+            dof = [0, 1, 5]
+        else:   # _dof = 6
+            dof = [0,1,2,3,4,5]
+
+        for i in dof:  
+            
+            # Extract columns with correct heading from the Linear Transfer Functions
+            LTF_amp = self._forceRAO[i][:][heading_index]   # Order of indexes to be synced with Marie
+            LTF_phase = self._forceRAO[i][:][heading_index] 
+
+            tau_wf[i] = np.sum(self._A * LTF_amp * np.exp(1j*(self._freqs * t  + LTF_phase + self._eps)))
+        
+        return tau_wf
 
     def second_order_loads(self, t, rel_angle, *args, **kwargs):
         """
@@ -90,7 +111,7 @@ class WaveLoad:
         heading_index = np.argmin(np.abs(self._angles - rel_angle))
         Q = self._Q[heading_index]
 
-        tau_sv = self._A.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._A
+        tau_sv = self._A.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._A # Missing real value here?
         return tau_sv
 
         
