@@ -44,11 +44,17 @@ def Rz(psi):
     ])
 
 
-def Rzyx(phi, theta, psi):
+def Rzyx(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
     return Rz(psi)@Ry(theta)@Rx(phi)
 
 
-def Tzyx(phi, theta, psi):
+def Tzyx(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
     return np.array([
         [1, np.sin(phi)*np.tan(theta), np.cos(phi)*np.tan(theta)],
         [0, np.cos(phi), -np.sin(phi)],
@@ -56,10 +62,14 @@ def Tzyx(phi, theta, psi):
     ])
 
 
-def J(phi, theta, psi):
+def J(eta):
+    phi = eta[3]
+    theta = eta[4]
+    psi = eta[5]
+
     return np.block([
-        [Rzyx(phi, theta, psi), np.zeros((3, 3))],
-        [np.zeros((3, 3)), Tzyx(phi, theta, psi)]
+        [Rzyx(eta), np.zeros((3, 3))],
+        [np.zeros((3, 3)), Tzyx(eta)]
     ])
 
 
