@@ -40,12 +40,13 @@ class WaveLoad:
         self._params = vessel_params
         # self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
         self._g = g
+        self._dof = dof
         self._rho = rho
-        self._A = np.empty(self._N)
         self._W = np.empty((self._N, self._N))
         self._P = np.empty_like(self._W)
         self._Q = np.empty((dof, len(self._angles), self._N, self._N))
-        self._forceRAO = np.empty(10)   # Just set random right know.
+        self._forceRAO = []
+        # må man kalle set_force funkjsonen?
 
 
     def _set_force_raos(self):
@@ -54,7 +55,15 @@ class WaveLoad:
         of 1st and second order wave loads. 
         Selected for the wave frequencies of the sea state by closest index.
         """
-        pass
+        num_freq = len(self._params['forceRAO']['amp'][0])
+        num_dir = len(self._params['forceRAO']['amp'][0][0])
+
+        for i in range(self._dof):
+            RAO = np.empty((num_freq, num_dir))
+            for j in range(num_freq):
+                for k in range(num_dir):
+                    RAO[j][k] = self._params['forceRAO']['amp'][i][j][k][0]
+            self._forceRAO.append(RAO)
     
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
@@ -89,7 +98,7 @@ class WaveLoad:
         heading_index = np.argmin(np.abs(self._angles - rel_angle))
         Q = self._Q[heading_index]
 
-        tau_sv = self._A.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._A
+        tau_sv = self._amp.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._amp
         return tau_sv
 
         
