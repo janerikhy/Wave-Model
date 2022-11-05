@@ -58,6 +58,9 @@ class WaveLoad:
         """
         num_dir = len(self._params['forceRAO']['amp'][0][0])
 
+        RAO_amp_full = []
+        RAO_phase_full = []
+
         for i in range(self._dof):
             RAOamp = np.empty((self._N, num_dir))
             RAOphase = np.empty((self._N, num_dir))
@@ -66,8 +69,9 @@ class WaveLoad:
                 for k in range(num_dir):
                     RAOamp[j][k] = self._params['forceRAO']['amp'][i][freq_index][k][0]
                     RAOphase[j][k] = self._params['forceRAO']['amp'][i][freq_index][k][0]
-            self._forceRAOamp.append(RAOamp)
-            self._forceRAOphase.append(RAOphase)
+            RAO_amp_full.append(RAOamp)
+            RAO_phase_full.append(RAOphase)
+        return RAO_amp_full, RAO_phase_full
     
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
