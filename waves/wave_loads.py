@@ -73,6 +73,31 @@ class WaveLoad:
             RAO_phase_full.append(RAOphase)
         return RAO_amp_full, RAO_phase_full
     
+    def _full_qtf_drift(self):
+
+        driftRAOfreqs = self._params['driftfrc']['w']
+        num_dir = len(self._params['forceRAO']['amp'][0][0])
+
+        freq_indices = np.empty(self._N)
+
+        for i in range(self._N):
+            freq_indices[i] = np.argmin(np.abs(driftRAOfreqs-self._freqs[i]))
+
+        Q = []
+
+        for i in range(self._dof):
+            RAO_lst = []
+            for j in range(num_dir):
+                RAO = np.empty((self._N, self._N))
+                for k in range (self._N):
+                    k_index = int(freq_indices[k])
+                    for l in range(self._N):
+                        l_index = int(freq_indices[l])
+                        RAO[k][l] = 0.5 * (self._params['driftfrc']['amp'][i][k_index][j][0] + self._params['driftfrc']['amp'][i][l_index][j][0])
+                RAO_lst.append(RAO)
+            Q.append(RAO_lst)
+        return Q
+    
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
         Calculate first order wave-loads by super position of 
@@ -108,34 +133,6 @@ class WaveLoad:
 
         tau_sv = self._amp.T@ (self._Q*np.exp(self._W*(1j*t) + self._P)) @ self._amp
         return tau_sv
-
-    def _QTF(self):
-
-        driftRAOfreqs = self._params['driftfrc']['w']
-        num_dir = len(self._params['forceRAO']['amp'][0][0])
-
-        freq_indices = np.empty(self._N)
-
-        for i in range(self._N):
-            freq_indices[i] = np.argmin(np.abs(driftRAOfreqs-self._freqs[i]))
-
-        driftRAO = []
-
-        for i in range(self._dof):
-            RAO_lst = []
-            for j in range(num_dir):
-                RAO = np.empty((self._N, self._N))
-                for k in range (self._N):
-                    k_index = int(freq_indices[k])
-                    for l in range(self._N):
-                        l_index = int(freq_indices[l])
-                        RAO[k][l] = 0.5 * (self._params['driftfrc']['amp'][i][k_index][j][0] + self._params['driftfrc']['amp'][i][l_index][j][0])
-                RAO_lst.append(RAO)
-            driftRAO.append(RAO_lst)
-        self._Q = driftRAO
-
-        # sikkert ikke den beste måten å løse dette på men skal funke :-)
-
         
 
 
