@@ -38,16 +38,12 @@ class WaveLoad:
         self._eps = eps
         self._angles = angles
         self._params = vessel_params
-        # self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
+        self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
         self._g = g
         self._dof = dof
         self._rho = rho
-        self._W = np.empty((self._N, self._N))
         self._P = np.empty_like(self._W)
-        self._Q = np.empty((dof, len(self._angles), self._N, self._N))
-        self._forceRAOamp = []
-        self._forceRAOphase = []
-        # må man kalle set_force funkjsonen?
+        self._Q, self._W = self._full_qtf_drift()
 
 
     def _set_force_raos(self):
@@ -84,19 +80,25 @@ class WaveLoad:
             freq_indices[i] = np.argmin(np.abs(driftRAOfreqs-self._freqs[i]))
 
         Q = []
+        W = []
 
         for i in range(self._dof):
             RAO_lst = []
+            W_lst = []
             for j in range(num_dir):
                 RAO = np.empty((self._N, self._N))
+                diff_W = np.empty((self._N, self._N))
                 for k in range (self._N):
                     k_index = int(freq_indices[k])
                     for l in range(self._N):
                         l_index = int(freq_indices[l])
                         RAO[k][l] = 0.5 * (self._params['driftfrc']['amp'][i][k_index][j][0] + self._params['driftfrc']['amp'][i][l_index][j][0])
+                        diff_W[k][l] = self._freqs[l] - self._freqs[k]
                 RAO_lst.append(RAO)
+                W_lst.append(diff_W)
             Q.append(RAO_lst)
-        return Q
+            W.append(W_lst)
+        return Q, W
     
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
