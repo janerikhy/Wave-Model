@@ -44,6 +44,7 @@ class WaveLoad:
         self._params = vessel_params
         # self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
         self._g = g
+        self._k = freqs**2/g
         self._rho = rho
         self._W = freqs[:, None] - freqs
         self._P = eps[:, None] - eps
@@ -52,7 +53,9 @@ class WaveLoad:
             np.asarray(vessel_params['freqs']),
             np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0]
         )
-        self._forceRAO = np.empty(10)   # Just set random right know.
+        # self._forceRAOamp = np.asarray(vessel_params['forceRAO']['amp'])[:, :, :, 0]
+        # self._forceRAOphase = np.asarray(vessel_params['forceRAO']['phase'])[:, :, :, 0]
+        self._set_force_raos()
 
 
     def _set_force_raos(self):
@@ -61,22 +64,51 @@ class WaveLoad:
         of 1st and second order wave loads. 
         Selected for the wave frequencies of the sea state by closest index.
         """
-        pass
-    
-    def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
+        amp = np.array(self._params['forceRAO']['amp'])[:, :, :, 0]
+        phase = np.array(self._params['forceRAO']['phase'])[:, :, :, 0]
+        freqs = np.array(self._params['freqs'])
+
+        heading_indx = np.array([np.argmin(np.abs(self._qtf_angles - angle)) for angle in self._angles])
+        freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
+        print(f"Heading_indx shape: {heading_indx.shape}")
+        print(f"Freq_indx shape: {freq_indx.shape}")
+
+        self._forceRAOamp = np.zeros((6, self._N, self._N))
+        self._forceRAOphase = np.zeros((6, self._N, self._N))
+        for dof in range(6):
+            self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0, :, [heading_indx]][0]
+            self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0, :, [heading_indx]][0]
+
+
+    def first_order_loads(self, t, rel_angle, eta):
         """
         Calculate first order wave-loads by super position of 
         wave load from each individual wave component.
 
         (Assumption: The force RAO amplitude and phase is known).
+
         """
         # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
-        rel_angle = heading - self._angles
-        heading_index = np.argmin(np.abs(rao_angles - rel_angle))
+        # ONLY COMPUTING FOR UNI-DIR WAVES KNOW.
+        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
 
-        # forceRAOs = self._forceRAO[dof, [heading_index], ]
+        rao_amp = self._forceRAOamp[:, :, heading_index]
+        rao_phase = self._forceRAOphase[:, :, heading_index]
+    
+        x = eta[0]
+        y = eta[1]
 
-        pass
+        rao = rao_amp*np.cos(
+            self._freqs*t -
+            self._k*x*np.cos(self._angles) - self._k*y*np.sin(self._angles) -
+            self._eps - rao_phase
+        )
+        tau_wf = np.zeros(6)
+
+        for dof in range(6):
+            tau_wf[dof] = self._amp@rao[dof]
+
+        return tau_wf
 
     def second_order_loads(self, t, rel_angle):
         """
@@ -94,7 +126,6 @@ class WaveLoad:
 
         # Get the QTF matrix for the given heading.
         heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
-        print(f"Indx: {heading_index}, Relative angle: {self._qtf_angles[heading_index]}")
         Q = self._Q[:, heading_index, :, :]
 
         tau_sv = np.zeros(6)
