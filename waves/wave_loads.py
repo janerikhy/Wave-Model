@@ -68,18 +68,19 @@ class WaveLoad:
         phase = np.array(self._params['forceRAO']['phase'])[:, :, :, 0]
         freqs = np.array(self._params['freqs'])
 
+        # DO WE NEED TO SET THE HEADING INDEX FOR THIS FUNCTION?
+
         heading_indx = np.array([np.argmin(np.abs(self._qtf_angles - angle)) for angle in self._angles])
         freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
-        print(f"Heading_indx shape: {heading_indx.shape}")
-        print(f"Freq_indx shape: {freq_indx.shape}")
 
-        self._forceRAOamp = np.zeros((6, self._N, self._N))
-        self._forceRAOphase = np.zeros((6, self._N, self._N))
+
+        self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
+        self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
         for dof in range(6):
-            self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0, :, [heading_indx]][0]
-            self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0, :, [heading_indx]][0]
+            self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
+            self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
-
+    @timeit
     def first_order_loads(self, t, rel_angle, eta):
         """
         Calculate first order wave-loads by super position of 
@@ -105,11 +106,14 @@ class WaveLoad:
         )
         tau_wf = np.zeros(6)
 
-        for dof in range(6):
-            tau_wf[dof] = self._amp@rao[dof]
+        # for dof in range(6):
+        #     tau_wf[dof] = self._amp@rao[dof]
+
+        tau_wf = rao@self._amp
 
         return tau_wf
 
+    @timeit
     def second_order_loads(self, t, rel_angle):
         """
         Calcualation of second order drift loads.
