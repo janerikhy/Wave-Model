@@ -42,8 +42,7 @@ class WaveLoad:
         self._g = g
         self._dof = dof
         self._rho = rho
-        self._P = np.empty_like(self._W)
-        self._Q, self._W = self._full_qtf_drift()
+        self._Q, self._W, self._P = self._set_drift_matrices()
 
 
     def _set_force_raos(self):
@@ -69,7 +68,8 @@ class WaveLoad:
             RAO_phase_full.append(RAOphase)
         return RAO_amp_full, RAO_phase_full
     
-    def _full_qtf_drift(self):
+
+    def _set_drift_matrices(self):
 
         driftRAOfreqs = self._params['driftfrc']['w']
         num_dir = len(self._params['forceRAO']['amp'][0][0])
@@ -81,24 +81,31 @@ class WaveLoad:
 
         Q = []
         W = []
+        P = []
 
         for i in range(self._dof):
             RAO_lst = []
             W_lst = []
+            eps_lst = []
             for j in range(num_dir):
                 RAO = np.empty((self._N, self._N))
                 diff_W = np.empty((self._N, self._N))
+                diff_eps = np.empty((self._N, self._N))
                 for k in range (self._N):
                     k_index = int(freq_indices[k])
                     for l in range(self._N):
                         l_index = int(freq_indices[l])
                         RAO[k][l] = 0.5 * (self._params['driftfrc']['amp'][i][k_index][j][0] + self._params['driftfrc']['amp'][i][l_index][j][0])
                         diff_W[k][l] = self._freqs[l] - self._freqs[k]
+                        diff_eps[k][l] = self._eps[l] - self._eps[k]
                 RAO_lst.append(RAO)
                 W_lst.append(diff_W)
+                eps_lst.append(diff_eps)
             Q.append(RAO_lst)
             W.append(W_lst)
-        return Q, W
+            P.append(eps_lst)
+        return Q, W, P
+
     
     def first_order_loads(self, heading, rao_angles, dof=0, **kwargs):
         """
