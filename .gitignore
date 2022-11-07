@@ -131,3 +131,6 @@ dmypy.json
 
 # FFMPEG 
 ffmpeg.exe
+
+# Ignore mp4 videos.
+*.mp4
