@@ -104,10 +104,6 @@ class WaveLoad:
             self._k*x*np.cos(self._angles) - self._k*y*np.sin(self._angles) -
             self._eps - rao_phase
         )
-        tau_wf = np.zeros(6)
-
-        # for dof in range(6):
-        #     tau_wf[dof] = self._amp@rao[dof]
 
         tau_wf = rao@self._amp
 
@@ -121,21 +117,30 @@ class WaveLoad:
         Estimate 2nd order drift loads using either Newman or formulation from 
         Standing, Brendling and Wilson (as used by OrcaFlex).
 
+        Parameters:
+        -----------
+        t : float
+            Time
+        rel_anlge: float
+            Relative incident wave angle
+
+        Return:
+        -------
+        tau_sv : 6x1 - array
+            Array of slowly-vayring load components for each DOF.
+
         References
         ----------
         [Newman 1974] INSERT HER
         [Standing, Brendling and Wilson]
         """
-        # Implementation - currently for only 1 DOF
 
-        # Get the QTF matrix for the given heading.
+        # Get the QTF matrix for the given heading for each DOF.
         heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
         Q = self._Q[:, heading_index, :, :]
 
         tau_sv = np.real(self._amp@(Q*np.exp(self._W*(1j*t) + 1j*self._P))@self._amp)
-        # tau_sv = np.zeros(6)
-        # for i in [0, 1, 5]:
-        #     tau_sv[i] = np.real(self._amp.T@ (Q[i]*np.exp(self._W*(1j*t) + 1j*self._P)) @ self._amp)
+        
         return tau_sv
 
 
@@ -242,8 +247,7 @@ class WaveLoad:
                     Q[dof, i] = 0.5*(Qdiag[0, :, i, None] + Qdiag[0, :, i])
         
         # From config file, qtf[2] is yaw - not heave. Changing this here.
-        temp = Q[2]
-        Q[5] = Q[2]
+        Q[5] = Q[2].copy()
         Q[2] = np.zeros_like(Q[0])
         return Q
         
