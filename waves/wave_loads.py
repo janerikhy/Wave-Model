@@ -132,9 +132,10 @@ class WaveLoad:
         heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
         Q = self._Q[:, heading_index, :, :]
 
-        tau_sv = np.zeros(6)
-        for i in [0, 1, 5]:
-            tau_sv[i] = np.real(self._amp.T@ (Q[i]*np.exp(self._W*(1j*t) + 1j*self._P)) @ self._amp)
+        tau_sv = np.real(self._amp@(Q*np.exp(self._W*(1j*t) + 1j*self._P))@self._amp)
+        # tau_sv = np.zeros(6)
+        # for i in [0, 1, 5]:
+        #     tau_sv[i] = np.real(self._amp.T@ (Q[i]*np.exp(self._W*(1j*t) + 1j*self._P)) @ self._amp)
         return tau_sv
 
 
