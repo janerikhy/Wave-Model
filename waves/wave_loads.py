@@ -20,16 +20,33 @@ class WaveLoad:
         Random wave phases.
     _angles : 1D-array
         Wave directional angles.
-    _params : 
+    _qtf_angles: 1D-array
+        Array of angles used in computation of QTFs in Veres.
+    _params : dict
         Vessel parameters with 1nd and 2nd order transfer functions.
     _g : float
         Gravitational acceleration constant.
+    _k : 1D-array
+        Wave number for each wave component found by linear deep-water dispersion relation.
     _rho : float
         Water density.
-    _force_rao_amp : array_like
+    _W : N x N - array
+        2D array of difference frequencies for each wave pair.
+    _P : N x N - array
+        2D array of phase difference for each wave pair.
+    _Q : 6 x M x N x N - array
+        Array of full QTFs for each DOF, for M relative wave angles and N wave components.
+    _forceRAOamp : array_like
         Vessel force RAO amplitude for the given wave frequencies _freq.
-    _force_rao_phase : array_like
+    _forceRAOphase : array_like
         Vessel force RAO phase for the given wave frequencies _freq.
+
+    Methods
+    -------
+    _set_force_raos()
+    _first_order_loads()
+    _second_order_loads()
+    _full_qtf_6dof()
     """
 
     def __init__(self, wave_amps, freqs, eps, angles, config_file, rho=1025, g=9.81, dof=6):
@@ -42,7 +59,6 @@ class WaveLoad:
         self._angles = angles
         self._qtf_angles = np.asarray(vessel_params['headings'])
         self._params = vessel_params
-        # self._force_rao_amp, self._force_rao_phase = self._set_force_raos()
         self._g = g
         self._k = freqs**2/g
         self._rho = rho
@@ -53,26 +69,20 @@ class WaveLoad:
             np.asarray(vessel_params['freqs']),
             np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0]
         )
-        # self._forceRAOamp = np.asarray(vessel_params['forceRAO']['amp'])[:, :, :, 0]
-        # self._forceRAOphase = np.asarray(vessel_params['forceRAO']['phase'])[:, :, :, 0]
         self._set_force_raos()
 
 
     def _set_force_raos(self):
         """
-        Function to set the force raos to be used in calculation
-        of 1st and second order wave loads. 
-        Selected for the wave frequencies of the sea state by closest index.
+        Function to set the force RAOs to be used in calculation
+        of 1st order wave loads.
+        Selected for the wave frequencies of the sea-state by closest index.
         """
         amp = np.array(self._params['forceRAO']['amp'])[:, :, :, 0]
         phase = np.array(self._params['forceRAO']['phase'])[:, :, :, 0]
         freqs = np.array(self._params['freqs'])
 
-        # DO WE NEED TO SET THE HEADING INDEX FOR THIS FUNCTION?
-
-        heading_indx = np.array([np.argmin(np.abs(self._qtf_angles - angle)) for angle in self._angles])
         freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
-
 
         self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
         self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
@@ -88,14 +98,30 @@ class WaveLoad:
 
         (Assumption: The force RAO amplitude and phase is known).
 
+        Parameters
+        ----------
+        self : Vessel object
+        t : float
+            Time instance
+        rel_angle : float
+            Relative wave incident angle
+        eta : 1D - array
+            Pose of vessel
+
+        Return
+        ------
+        tau_wf : 6x1 array
+            First order wave-frequency load for each DOF.
         """
         # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
-        # ONLY COMPUTING FOR UNI-DIR WAVES KNOW.
+        # ONLY COMPUTING FOR UNI-DIR WAVES.
         heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
 
+        # Select RAO for given relative wave angle.
         rao_amp = self._forceRAOamp[:, :, heading_index]
         rao_phase = self._forceRAOphase[:, :, heading_index]
     
+        # Horizontal position of vessel (N, E).
         x = eta[0]
         y = eta[1]
 
@@ -142,72 +168,6 @@ class WaveLoad:
         tau_sv = np.real(self._amp@(Q*np.exp(self._W*(1j*t) + 1j*self._P))@self._amp)
         
         return tau_sv
-
-
-    @timeit
-    def _full_qtf(self, qtf_headings, qtf_freqs, qtfs, angle, method="Newman"):
-        """
-        Calculate the full QTF matrix for a fixed heading by Newmans approximation or 
-        the geometric mean formulation. 
-        
-        #### MAKE THIS RETURN A (36, 47, 47) MATRIX AS - ONE 47 x 47 MATRIX FOR EACH HEADING!!!
-
-        Note
-        ----
-        Only implemented for unidirectional waves at this moment. 
-
-        Parameters
-        ----------
-        qtf_headings : 1D-array
-            Headings used in calculation of QTFs
-        qtf_freqs : 1D-array
-            Frequencies used in calculation of QTFs
-        qtf_diag : 1D-array
-            The diagonal terms of the QTF for a given heading.
-        angle : 1D-array
-            Relative wave directional anlge.
-        method : string (default='Newman')
-            Method to be used for approximation.
-        
-        Returns
-        -------
-        QTF : 2D-array
-            Full QTF matrix for a fixed heading.
-
-        References
-        ----------
-        [Newman, 1974] INSERT HER
-        [Standing, Brendling and Wilson]
-        """
-
-        # First -> pick the values to be used for a given angle.
-        heading_index = np.argmin(np.abs(qtf_headings - angle))
-        qtf_diag = qtfs[:, heading_index, 0]
-
-        # Second -> interpolate to the frequencies used in wave spectra. (self._freqs)
-        # Chosen to use closes frequency instead - this could be changed to an interpolation scheme instead.
-        freq_indices = [np.argmin(np.abs(qtf_freqs - wave_freq)) for wave_freq in self._freqs]
-
-        # Third -> generate full QTF matrix based on either Newman approx or Geometric Mean
-
-        QTF = np.empty((self._N, self._N))
-        for i, freq_i in enumerate(freq_indices):
-            Q_i = qtf_diag[freq_i]
-            for j, freq_j in enumerate(freq_indices):
-                Q_j = qtf_diag[freq_j]
-
-                if method=="Newman":
-                    QTF[i, j] = 0.5*(Q_i + Q_j)
-                else:
-                    # Using geometric mean approximation
-                    sgn_equal = np.sign(Q_i) == np.sign(Q_j)
-                    if sgn_equal:
-                        QTF[i, j] = np.sign(Q_i)*np.abs(Q_i*Q_j)**(.5)
-                    else:
-                        QTF[i, j] = 0
-
-        return QTF
-
 
     @timeit
     def _full_qtf_6dof(self, qtf_headings, qtf_freqs, qtfs, method="Newman"):
