@@ -90,7 +90,7 @@ class WaveLoad:
             self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
             self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
-    @timeit
+    #@timeit
     def first_order_loads(self, t, rel_angle, eta):
         """
         Calculate first order wave-loads by super position of 

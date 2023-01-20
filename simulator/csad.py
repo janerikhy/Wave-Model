@@ -80,11 +80,11 @@ class CSAD_DP_6DOF(Vessel):
             data = json.load(f)
         
         self._Mrb = np.asarray(data['MRB'])         # Rigid body mass matrix
-        self._Ma = np.asarray(data['A'])[:, :, 40]  # Added mass matrix
+        self._Ma = np.asarray(data['A'])[:, :, 41]  # Added mass matrix
         self._M = self._Mrb + self._Ma              # Total mass matrix
         self._Minv = np.linalg.inv(self._M)         # Inverse mass matrix
 
-        self._Dp = np.asarray(data['B'])[:, :, 40]  # Potential damping
+        self._Dp = np.asarray(data['B'])[:, :, 41]  # Potential damping
         self._Dv = np.asarray(data['Bv'])           # Viscous damping
         self._D = self._Dp + self._Dv               # Total damping
         self._D[3, 3] *= 2                          # Increase roll damping

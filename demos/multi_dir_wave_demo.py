@@ -15,13 +15,24 @@ print(sys.path)
 from waves.wave_spectra import DirectionalSpectrum, JONSWAP
 
 # Set plot parameters
-plt.rcParams.update({
-    'figure.figsize': (12, 12),
-    'font.size': 14,
-    'axes.grid': True,
-    'lines.linewidth': 1.5
-})
+width = 426.8       # Latex document width in pts
+inch_pr_pt = 1/72.27        # Ratio between pts and inches
 
+golden_ratio = (np.sqrt(5) - 1)/2
+fig_width = width*inch_pr_pt
+fig_height = fig_width*golden_ratio
+fig_size = [fig_width, fig_height]
+
+params = {'backend': 'PS',
+          'axes.labelsize': 10,
+          'font.size': 10,
+          'legend.fontsize': 10,
+          'xtick.labelsize': 8,
+          'ytick.labelsize': 8,
+          'text.usetex': True,
+          'figure.figsize': fig_size} 
+
+plt.rcParams.update(params)
 
 # Set sea-state parameters
 hs = 2.
@@ -79,5 +90,8 @@ ax2 = fig.add_subplot(122, projection="3d")
 ax2.view_init(40, 40)
 ax2.plot_surface(X, Y, wave_elevation, cmap=cm.coolwarm)
 ax2.set_zlim(-1.5*hs, 1.5*hs)
-
+#ax2.set_zlabel("$\zeta_a \; [m]$")
+#ax2.set_ylabel("$y \; [m]$")
+#ax2.set_xlabel("$x \; [m]$")
+plt.savefig("multi_dir_wave_realization.eps")
 plt.show()
