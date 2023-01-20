@@ -138,3 +138,6 @@ ffmpeg.exe
 # Ignore images for plots
 *.svg
 *.eps
+
+# Ignore simulation result files under notebook
+notebooks/
