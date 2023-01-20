@@ -140,4 +140,4 @@ ffmpeg.exe
 *.eps
 
 # Ignore simulation result files under notebook
-notebooks/
+.vscode
