@@ -26,12 +26,25 @@ class Vessel(ABC):
         pass
 
     def get_eta(self):
+        """Get vessel pose eta.
+
+        Returns
+        -------
+        self._eta : 6 x 1 array.        
+        """
         return self._eta
 
     def get_nu(self):
+        """Get vessel velocity nu.
+        
+        Returns
+        -------
+        self._nu : 6 x 1 array.
+        """
         return self._nu
 
     def reset(self):
+        """Reset state vector to zeroes."""
         self._x = np.zeros(2*self._dof)
         self._x_dot = np.zeros_like(self._x)
         self._eta = np.zeros(self._dof)
@@ -39,9 +52,12 @@ class Vessel(ABC):
 
     @abstractclassmethod
     def x_dot(self, *args, **kwargs):
+        """Kinematic and kinetic equation of vessel. The method must be overwritten
+        by inherting vessel classes."""
         raise NotImplementedError
 
     def integrate(self):
+        """Integrate the state vector one forward, using forward Euler integration."""
         self._x = self._x + self._dt * self._x_dot
         self._eta = self._x[:self._dof]
         self._eta[self._dof//6+2:] = pipi(self._eta[self._dof//6+2:])

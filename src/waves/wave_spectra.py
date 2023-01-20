@@ -35,8 +35,7 @@ class BaseSpectrum(ABC):
 
 
     def realization(self, time, *args, **kwargs):
-        """
-        Generate a wave realization from wave spectrum at a fixed position.
+        """Generate a wave realization from wave spectrum at a fixed position.
 
         Parameters
         ----------
@@ -77,8 +76,7 @@ class BasePMSpectrum(BaseSpectrum):
 class ModifiedPiersonMoskowitz(BasePMSpectrum):
 
     def __call__(self, hs, tp, freq_hz=None):
-        """
-        Generate a Modified Pierson-Moskowitz wave spectrum.
+        """Generate a Modified Pierson-Moskowitz wave spectrum.
 
         Parameters
         ----------
@@ -114,8 +112,7 @@ class ModifiedPiersonMoskowitz(BasePMSpectrum):
 class JONSWAP(ModifiedPiersonMoskowitz):
 
     def __call__(self, hs, tp, gamma=1, freq_hz=None):
-        """
-        Generate a JONSWAP wave spectrum.
+        """Generate a JONSWAP wave spectrum.
 
         Parameters
         ----------

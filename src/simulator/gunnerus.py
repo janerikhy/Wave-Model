@@ -19,8 +19,7 @@ GUNNERUS_DATA = os.path.abspath(
 
 
 class GunnerusManeuvering3DoF(Vessel):
-    """
-    3DOF Manuevering model for R/V Gunnerus. The model is based on maneuvering theory.
+    """3DOF Manuevering model for R/V Gunnerus. The model is based on maneuvering theory.
     Zero-Frequency model.    
 
     References
