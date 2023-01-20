@@ -92,6 +92,7 @@ class CSAD_DP_6DOF(Vessel):
         self._G = np.asarray(data['C'])[:, :, 0]    # Restoring coefficients  
 
     def x_dot(self, Uc, betac, tau):
+        """Kinematic and kinetic equation for 6DOF simulation model."""
         eta = self.get_eta()
         nu = self.get_nu()
 
