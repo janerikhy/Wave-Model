@@ -134,3 +134,7 @@ ffmpeg.exe
 
 # Ignore mp4 videos.
 *.mp4
+
+# Ignore images for plots
+*.svg
+*.eps
