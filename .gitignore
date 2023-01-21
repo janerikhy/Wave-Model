@@ -109,6 +109,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.test_pkg_venv
+test_pkg_venv/
 
 # Spyder project settings
 .spyderproject
