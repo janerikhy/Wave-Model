@@ -1,7 +1,7 @@
 # Module for computing wave loads on vessel
 import numpy as np
 import json
-from utils import timeit
+from src.utils import timeit
 
 class WaveLoad:
     """

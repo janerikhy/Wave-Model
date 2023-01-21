@@ -2,7 +2,7 @@
 import numpy as np
 from abc import ABC, abstractclassmethod
 
-from utils import Rz, Smat, J, timeit, pipi
+from src.utils import pipi
 
 
 class Vessel(ABC):
