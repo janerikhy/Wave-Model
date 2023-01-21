@@ -1,0 +1,4 @@
+include src/vessel_data/CSAD/*.json
+include src/vessel_data/CSAD/*.npy
+include src/vessel_data/gunnerus/*.json
+include src/vessel_data/gunnerus/*.pkl
