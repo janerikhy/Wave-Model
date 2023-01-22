@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from waves.wave_loads import WaveLoad
-from simulator.csad import CSAD_DP_6DOF
+from MCSimPython.waves.wave_loads import WaveLoad
+from MCSimPython.simulator.csad import CSAD_DP_6DOF
 
 width = 426.8       # Latex document width in pts
 inch_pr_pt = 1/72.27        # Ratio between pts and inches

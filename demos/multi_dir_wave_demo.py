@@ -12,7 +12,7 @@ sys.path.insert(0, cwd)
 print(cwd)
 print(sys.path)
 
-from waves.wave_spectra import DirectionalSpectrum, JONSWAP
+from MCSimPython.waves.wave_spectra import DirectionalSpectrum, JONSWAP
 
 # Set plot parameters
 width = 426.8       # Latex document width in pts
