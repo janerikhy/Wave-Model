@@ -3,8 +3,8 @@ import numpy as np
 import os
 import json
 
-from simulator.vessel import Vessel
-from src.utils import Smat, Rz, J
+from MCSimPython.simulator.vessel import Vessel
+from MCSimPython.utils import Smat, Rz, J
 
 """
 Vessel models for C/S Arctic Drillship.

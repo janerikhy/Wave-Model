@@ -1,4 +1,4 @@
-include src/vessel_data/CSAD/*.json
-include src/vessel_data/CSAD/*.npy
-include src/vessel_data/gunnerus/*.json
-include src/vessel_data/gunnerus/*.pkl
+include src/MCSimPython/vessel_data/CSAD/*.json
+include src/MCSimPython/vessel_data/CSAD/*.npy
+include src/MCSimPython/vessel_data/gunnerus/*.json
+include src/MCSimPython/vessel_data/gunnerus/*.pkl

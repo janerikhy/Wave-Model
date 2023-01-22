@@ -2,7 +2,7 @@
 import numpy as np
 from abc import ABC, abstractclassmethod
 
-from src.utils import pipi
+from MCSimPython.utils import pipi
 
 
 class Vessel(ABC):

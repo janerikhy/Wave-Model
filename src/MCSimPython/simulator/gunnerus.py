@@ -1,6 +1,6 @@
 # gunnerus.py
-from simulator.vessel import Vessel
-from src.utils import J, Rz, Smat, pipi
+from MCSimPython.simulator.vessel import Vessel
+from MCSimPython.utils import J, Rz, Smat, pipi
 
 import numpy as np
 import pickle

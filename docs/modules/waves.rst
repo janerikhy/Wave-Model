@@ -2,12 +2,12 @@ Waves
 =====
 
 
-.. automodule:: waves.wave_spectra
+.. automodule:: MCSimPython.waves.wave_spectra
     :members:
     :undoc-members:
     :special-members: __call__
 
-.. automodule:: waves.wave_loads
+.. automodule:: MCSimPython.waves.wave_loads
     :members:
     :undoc-members:
 

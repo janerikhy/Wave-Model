@@ -4,15 +4,15 @@ Simulator
 Base Vessel
 -----------
 
-.. autoclass:: simulator.vessel.Vessel
+.. autoclass:: MCSimPython.simulator.vessel.Vessel
     :members:
 
 Gunnerus
 --------
-.. automodule:: simulator.gunnerus
+.. automodule:: MCSimPython.simulator.gunnerus
     :members:
 
 CSAD
 ----
-.. automodule:: simulator.csad
+.. automodule:: MCSimPython.simulator.csad
     :members:
