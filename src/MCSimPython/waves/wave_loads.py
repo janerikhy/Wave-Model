@@ -4,8 +4,7 @@ import json
 from MCSimPython.utils import timeit
 
 class WaveLoad:
-    """
-    Class for computation of wave loads on floating structure. Both 
+    """Class for computation of wave loads on floating structure. Both 
     1st and 2nd order wave loads are considered.
 
     Attributes
