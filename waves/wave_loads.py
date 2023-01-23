@@ -85,11 +85,8 @@ class WaveLoad:
         tau_wf = np.zeros(self._dof)
 
         # Should probably implement this better. only compatible for 3 and 6 DOF atm
-        if self._dof == 3:
-            dofs = [0, 1, 5]
-        else:   # _dof = 6
-            dofs = [0,1,2,3,4,5]
-
+        dofs = [0, 1, 5] if (self._dof == 3) else  [0,1,2,3,4,5]
+        
 
         if self._irregular:
             count = 0
@@ -133,7 +130,7 @@ class WaveLoad:
         
         ------------------
         Input arguments:
-            t: time d
+            t: time
             heading: Scalar angle in NED-frame describing the orientation of the vessel
             rao_angles: List of all angles with data in the RAOs  i.e.:[0 10 20 30 ... 350]
         ------------------
@@ -153,10 +150,8 @@ class WaveLoad:
         tau_sv = np.zeros(self._dof)
 
         # Should probably implement this better. only compatible for 3 and 6 DOF atm
-        if self._dof == 3:
-            dofs = [0, 1, 5]
-        else:   # _dof = 6
-            dofs = [0,1,2,3,4,5]
+        dofs = [0, 1, 5] if (self._dof == 3) else  [0,1,2,3,4,5]
+
 
 
         if self._irregular:
