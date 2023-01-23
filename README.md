@@ -33,3 +33,25 @@ wavemodel.pth
 
 c:\Users\your_user\full_path\Wave-Model
 ```
+
+The structure should look like:
+
+```
+some_folder
+|___Wave-Model
+|   |
+|   |___Readme.md
+|   |___demos/
+|   |___simulator/
+|   |___waves/
+|   |___requirements.txt
+|   |___ ...
+|
+|___name-of-venv
+|   |
+|   |___Lib
+|       |
+|       |___site-packages
+|           |___wavemodel.pth
+|           |___ ...
+```
