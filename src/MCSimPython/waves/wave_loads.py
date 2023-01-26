@@ -89,7 +89,6 @@ class WaveLoad:
             self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
             self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
-    #@timeit
     def first_order_loads(self, t, rel_angle, eta):
         """
         Calculate first order wave-loads by super position of 
@@ -134,7 +133,6 @@ class WaveLoad:
 
         return tau_wf
 
-    @timeit
     def second_order_loads(self, t, rel_angle):
         """
         Calcualation of second order drift loads.
@@ -168,7 +166,6 @@ class WaveLoad:
         
         return tau_sv
 
-    @timeit
     def _full_qtf_6dof(self, qtf_headings, qtf_freqs, qtfs, method="Newman"):
         """
         Generate the full QTF matrix for all DOF, all headings with calculated QTF
