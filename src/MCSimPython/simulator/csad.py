@@ -38,9 +38,9 @@ class CSADMan3DOF(Vessel):
         Viscous damping
     """
 
-    def __init__(self, dt, *args, dof=3, config_file="vessel_json.json", **kwargs):
+    def __init__(self, dt, *args, method="Euler", dof=3, config_file="vessel_json.json", **kwargs):
         config_file = os.path.join(DATA_DIR, config_file)
-        super().__init__(dt, config_file=config_file, dof=dof)
+        super().__init__(dt, method=method, config_file=config_file, dof=dof)
         ind_3dof = np.ix_([0, 1, 5], [0, 1, 5])
         with open(config_file, 'r') as f:
             data = json.load(f)
@@ -52,17 +52,36 @@ class CSADMan3DOF(Vessel):
         self._Bv = np.asarray(data['Bv'])[ind_3dof]
 
 
-    def x_dot(self, Uc, betac, tau):
+    def x_dot(self, x, Uc, betac, tau):
+        """Kinematic and kinetic equation for 6DOF simulation model.
+        
+        Parameters
+        ----------
+        x : array_like
+            State vector with dimensions 2*DOF
+        Uc : float
+            Current velocity in earth-fixed frame
+        betac : float
+            Current direction in earth-fixed frame [rad]
+        tau : array_like
+            External loads (e.g wind, thrusters, ice, etc). Must correspond with numb. DOF.
+
+        Returns
+        -------
+        x_dot : array_like
+            The derivative of the state vector.
+        """
+        eta = x[:self._dof]
+        nu = x[self._dof:]
         nu_cn = Uc*np.array([np.cos(betac), np.sin(betac), 0])
-        nu_c = Rz(self._eta[2]).T@nu_cn
+        nu_c = Rz(eta[2]).T@nu_cn
+        nu_r = nu - nu_c
+        dnu_c = -Smat(nu)@nu_c
 
-        nu_r = self._nu - nu_c
-        dnu_c = -Smat(self.get_nu())@nu_c
-
-        eta_dot = Rz(self._eta[2])@self._nu
+        eta_dot = Rz(eta[2])@nu
         nu_dot = self._Minv@(tau - self._Bv@nu_r - self._D@nu_r + self._Ma@dnu_c)
-        self._x_dot = np.concatenate([eta_dot, nu_dot])
-
+        # self._x_dot = np.concatenate([eta_dot, nu_dot])
+        return np.concatenate([eta_dot, nu_dot])
 
 class CSAD_DP_6DOF(Vessel):
     """6 DOF DP simulator model for CSAD.
@@ -73,9 +92,9 @@ class CSAD_DP_6DOF(Vessel):
     No fluid memory effects are included yet.
     """
 
-    def __init__(self, dt, *args, config_file="vessel_json.json", dof=6, **kwargs):
+    def __init__(self, dt, *args, method="Euler", config_file="vessel_json.json", dof=6, **kwargs):
         config_file = os.path.join(DATA_DIR, config_file)
-        super().__init__(dt, config_file, dof=6)
+        super().__init__(dt, config_file=config_file, method=method, dof=6)
         with open(config_file, 'r') as f:
             data = json.load(f)
         
@@ -91,21 +110,39 @@ class CSAD_DP_6DOF(Vessel):
 
         self._G = np.asarray(data['C'])[:, :, 0]    # Restoring coefficients  
 
-    def x_dot(self, Uc, betac, tau):
-        """Kinematic and kinetic equation for 6DOF simulation model."""
-        eta = self.get_eta()
-        nu = self.get_nu()
+    def x_dot(self, x, Uc, betac, tau):
+        """Kinematic and kinetic equation for 6DOF simulation model.
+        
+        Parameters
+        ----------
+        x : array_like
+            State vector with dimensions 12x1
+        Uc : float
+            Current velocity in earth-fixed frame
+        betac : float
+            Current direction in earth-fixed frame [rad]
+        tau : array_like
+            External loads (e.g wind, thrusters, ice, etc). Must be a 6x1 vector.
 
-        nu_cn = Uc*np.array([np.cos(betac), np.sin(betac)])
-        nu_cn = np.concatenate([nu_cn, np.zeros(4)])
+        Returns
+        -------
+        x_dot : array_like
+            The derivative of the state vector.
+        """
+        eta = x[:self._dof]
+        nu = x[self._dof:]
+
+        nu_cn = Uc*np.array([np.cos(betac), np.sin(betac), 0])
+        # nu_cn = np.concatenate([nu_cn, np.zeros(4)])
         Jinv = np.linalg.inv(J(eta))
-        nu_c = Jinv@nu_cn
-
+        nu_c = Rz(eta[-1]).T@nu_cn
+        nu_c = np.insert(nu_c, [3, 3, 3], 0)
         nu_r = nu - nu_c
         eta_dot = J(eta)@nu
 
-        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@Jinv@eta)
-        self._x_dot = np.concatenate([eta_dot, nu_dot])
+        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@eta) #- self._G@Jinv@eta)
+        #self._x_dot = np.concatenate([eta_dot, nu_dot])
+        return np.concatenate([eta_dot, nu_dot])
 
 
 # class CSAD6DOF(Vessel):
