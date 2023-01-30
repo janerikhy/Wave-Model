@@ -1,6 +1,6 @@
 # observer.py
 import numpy as np
-from abc import ABC, abstractclassmethod
+from abc import ABC
 
 from utils import Rz, Smat, J, timeit, pipi
 
@@ -15,5 +15,8 @@ class Observer(ABC):
 
     def integrate(self):
         pass
+
+    def get_xhat(self):
+        return self.get
 
     
