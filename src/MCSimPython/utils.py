@@ -20,6 +20,12 @@ def pipi(theta):
     return np.mod(theta + np.pi, 2*np.pi) - np.pi
 
 
+def pipi2cont(psi, psi_prev):
+    """Lifting algorithm."""
+    arr = np.array([psi_prev, psi])
+    return np.unwrap(arr)[-1]
+
+
 def Rx(phi):
     return np.array([
         [1, 0, 0],
