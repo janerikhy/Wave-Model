@@ -101,9 +101,9 @@ class WaveLoad:
         self : Vessel object
         t : float
             Time instance
-        rel_angle : float
-            Relative wave incident angle
-        eta : 1D - array
+        rel_angle : array_like
+            Relative wave incident angle for each wave component
+        eta : array_like
             Pose of vessel
 
         Return
@@ -111,13 +111,13 @@ class WaveLoad:
         tau_wf : 6x1 array
             First order wave-frequency load for each DOF.
         """
-        # CHECK THE ANGLE DEFINITION FOR RELATIVE WAVE ANGLE.
-        # ONLY COMPUTING FOR UNI-DIR WAVES.
-        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
-
+        
+        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle[:, None])), axis=1)
+        #heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
+        freq_ind = np.arange(0, self._N)
         # Select RAO for given relative wave angle.
-        rao_amp = self._forceRAOamp[:, :, heading_index]
-        rao_phase = self._forceRAOphase[:, :, heading_index]
+        rao_amp = self._forceRAOamp[:, freq_ind, heading_index]
+        rao_phase = self._forceRAOphase[:, freq_ind, heading_index]
     
         # Horizontal position of vessel (N, E).
         x = eta[0]
