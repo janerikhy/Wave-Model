@@ -6,24 +6,30 @@ from utils import J, Rz, Smat, pipi
 
 class EKF(Observer):
     '''
-    EKF
+    Implementation of Extended Kalman Filter (EKF).
 
     x_hat = [
         zeta    (6DOF)
         eta     (3DOF)
-        nu      (3DOF)
         bias    (3DOF)
+        nu      (3DOF)
     ]
-
-
     '''
     def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15,15))):
+        '''
+        Initialization:
+
+        Input:
+            - dt: Time step
+            - M: Inertia matrix of system (including added mass)
+            - D: Full damping matrix of system
+        '''
         # Tuning
-        self._Qd = 0
-        self._Rd = 0
+        self._Qd = np.eye(6)
+        self._Rd = np.eye(3)
 
         # Constant matrices
-        i = np.ix_([0,1,5],[0,1,5])
+        i = np.ix_([0,1,5],[0,1,5])     # Extract surge-sway-yaw DOFs
         M = M[i]
         self._Minv = np.linalg.inv(M)
         D = D[i]
@@ -50,8 +56,8 @@ class EKF(Observer):
         '''
         Documentation
         '''
-        phi = NotImplementedError
-        gamma = NotImplementedError
+        phi = self.state_function_jacobian()
+        gamma = self.state_function_noise_jacobian()
         f = self.state_function(self._xhat, tau, np.zeros(6))
 
         self._Pbar = phi@self._Phat@phi.T + gamma@self._Qd@gamma.T
@@ -63,13 +69,13 @@ class EKF(Observer):
         Documentation
         '''
         H = self.measurement_function_jacobian()
-        K = self.EKF_gain(self, H)
+        K = self.EKF_gain(H)
 
-        parenthesis = np.eye(1) - K@H
+        parenthesis = np.eye(15) - K@H
 
         self._Phat = parenthesis@self._Pbar@parenthesis.T + K@self._Rd@K.T
         self._xhat = self._xbar + K @(y - H@self._xbar)
-        pass
+        
 
 
 
@@ -105,36 +111,76 @@ class EKF(Observer):
         return f
 
 
-    def state_function_jacobian(self, state, tau, noise):       # df/dx
+    def state_function_jacobian(self):       # df/dx
         '''
         Documentation
+        phi = eye(15) + dt * del(f)/del(x)
+
+        where
+
+        del(f)/del(x) = [
+            Aw          0_(6x3)     0_(6x3)         0_(6x3)                 row (1)
+            0_(3x6)     del_f2      0_(3x3)         R(psi)                  row (2)
+            0_(3x6)     0_(3x3)     0_(3x3)         0_(3x3)                 row (3)
+            0_(3x6)     del_f4      M_inv*R(psi).T  -M_inv*D                row (4)
+        ]   
         '''
-        raise NotImplementedError
+        phi = np.zeros((15,15))
+
+        psi = self._xhat[8]
+        b1 = self._xhat[9]
+        b2 = self._xhat[10]
+        u = self._xhat[12]
+        v = self._xhat[13]
+
+        del_f2 = np.array([
+                            [0,0,-u*np.sin(psi)-v*np.cos(psi)],
+                            [0,0,u*np.cos(psi)-v*np.sin(psi)],
+                            [0,0,0]
+        ])
+        del_f4 = np.array([
+                            [0,0,self._Minv[0,0]*(b2*np.cos(psi) - b1*np.sin(psi))],
+                            [0,0,-self._Minv[1,1]*(b1*np.cos(psi) + b2*np.sin(psi))],
+                            [0,0,-self._Minv[2,1]*(b1*np.cos(psi) + b2*np.sin(psi))]
+        ])
+
+        row1 = np.concatenate((self._Aw, np.zeros((6,9))), axis=1)
+        row2 = np.concatenate((np.zeros((3,6)), del_f2, np.zeros((3,3)), Rz(psi)), axis=1)
+        row3 = np.zeros((3,15))
+        row4 = np.concatenate((np.zeros((3,6)), del_f4, self._Minv@(Rz(psi).T), -self._Minv@self._D), axis=1)
+
+        phi = np.eye(15) + self._dt * np.concatenate((row1,row2,row3,row4), axis = 0)
+
+        return phi
+
+
 
     def state_function_noise_jacobian(self):
         '''
         Documentation
         '''
-
-        raise NotImplementedError                               # df/dw
+        gamma = self._dt * self._E
+        return gamma
 
     def measurement_function(self, x):                          # h(x,u)
         '''
-        Documentation
+        y = h(x,u)
         '''
         h = self._H @ x
         raise h
 
     def measurement_function_jacobian(self):                    # dh/dx
         '''
-        Documentation
-        '''
-        raise NotImplementedError
+        H = [ dh(x,u) / dx ]_(x=x_hat) = h
 
+        !!! NOT NECESSARY TO USE !!!
+        '''
+        H = self._H
+        return H
 
     def initialize_constant_matrices(self):
         '''
-        Documentation
+        x_dot = f(x,u,w) 
         '''
         # Aw
         omega = 2*np.pi/1 # afjdfasdfdasfsfasdf!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -161,7 +207,8 @@ class EKF(Observer):
         self._B = np.zeros((15,3))
         self._B[12:15, 0:3] = self._Minv
         
-
+    def get_xhat(self):
+        return super().get_xhat()
 
 '''
 Yet to do:
