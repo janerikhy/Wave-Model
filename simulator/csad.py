@@ -103,7 +103,7 @@ class CSAD_DP_6DOF(Vessel):
         nu_r = nu - nu_c
         eta_dot = J(eta)@nu
 
-        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@Jinv@eta)
+        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@eta)
         self._x_dot = np.concatenate([eta_dot, nu_dot])
 
 

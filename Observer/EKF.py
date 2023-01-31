@@ -26,7 +26,20 @@ class EKF(Observer):
         '''
         # Tuning
         self._Qd = np.eye(6)
+        self._Qd = np.array([
+            [1,0,0,0,0,0],
+            [0,1,0,0,0,0],
+            [0,0,0.2*np.pi/180,0,0,0],
+            [0,0,0,1e2,0,0],
+            [0,0,0,0,1e2,0],
+            [0,0,0,0,0,1e3]
+        ])
         self._Rd = np.eye(3)
+        self._Rd = np.array([
+            [1,0,0],
+            [0,1,0],
+            [0,0,np.pi/180]
+        ])
 
         # Constant matrices
         i = np.ix_([0,1,5],[0,1,5])     # Extract surge-sway-yaw DOFs
@@ -48,9 +61,6 @@ class EKF(Observer):
 
         self._Pbar = P0
         self._Phat = np.zeros((15,15))
-
-        
-
 
     def predictor(self, tau):
         '''
@@ -100,7 +110,7 @@ class EKF(Observer):
 
         Ax1 = np.array(
             [
-            (self._Aw@xi).A1,
+            (self._Aw@xi),
             (Rz(psi)@nu),
             np.zeros(3),
             (-self._Minv@self._D@nu - self._Minv@Rz(psi).T@b)
@@ -183,13 +193,15 @@ class EKF(Observer):
         x_dot = f(x,u,w) 
         '''
         # Aw
-        omega = 2*np.pi/1 # afjdfasdfdasfsfasdf!!!!!!!!!!!!!!!!!!!!!!!!!
+        Tp = 9
+        omega = 2*np.pi/Tp # afjdfasdfdasfsfasdf!!!!!!!!!!!!!!!!!!!!!!!!!
         zeta = 0.05
         Aw1 = np.zeros((3,3))
         Aw2 = np.eye(3)
         Aw3 = -omega**2*np.eye(3)
         Aw4 = -2*zeta*omega*np.eye(3)
-        self._Aw = np.bmat([[Aw1, Aw2],[Aw3, Aw4]])
+        #self._Aw = np.bmat([[Aw1, Aw2],[Aw3, Aw4]])
+        self._Aw = np.concatenate((np.concatenate((Aw1, Aw2), axis=1),np.concatenate((Aw3, Aw4), axis=1)), axis=0)  # Should probably be made more readable
 
         # E
         self._E = np.zeros((15,6))
