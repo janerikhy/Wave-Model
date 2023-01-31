@@ -3,6 +3,9 @@ import numpy as np
 from time import time
 
 
+dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
+dof3_array = np.ix_([0, 1, 5])
+
 def complex_to_polar(complex_values):
     complex_values = np.asarray_chkfinite(complex_values)
     amp = np.abs(complex_values)
