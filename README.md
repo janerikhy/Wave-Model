@@ -11,8 +11,8 @@ All code implementation is found in the `src` directory. The python package is s
 - `src/MCSimPython/simulator/` Simulation Models. *Python Path*:= `MCSimPython.simulator`
 - `src/MCSimPython/waves/` Wave kinematics, wave spectra, and wave loads. *Python Path* := `MCSimPython.waves`
 - `src/MCSimPython/guidance/` Reference Models. *Python path*:= `MCSimPython.guidance` *(in development)*
-- `src/MCSimPython/observers/` Observers : `MCSimPython.observer` *(not implemented yet)*
-- `src/MCSimPython/control` Controllers : `MCSimPython.control` *(not implemented yet)*
+- `src/MCSimPython/observers/` Observers : `MCSimPython.observer` *(in development)*
+- `src/MCSimPython/control` Controllers : `MCSimPython.control` *(in development)*
 
 ## How to use MCSimPython
 
