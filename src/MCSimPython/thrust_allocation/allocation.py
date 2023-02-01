@@ -73,6 +73,11 @@ class AllocatorCSAD(ABC):
 
         u_e = np.linalg.inv(K_e) @ T_e_pseudo @ tau_d
 
+        u = []
+
+        for i in range(self.n_thrusters):
+            u[i] = np.sqrt(u_e[i*2]**2 + u_e[i*2+1]**2)
+
 
 
     
