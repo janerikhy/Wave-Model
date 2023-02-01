@@ -48,7 +48,17 @@ class WaveLoad:
     _full_qtf_6dof()
     """
 
-    def __init__(self, wave_amps, freqs, eps, angles, config_file, rho=1025, g=9.81, dof=6):
+    def __init__(self, 
+                wave_amps,
+                freqs, 
+                eps, 
+                angles, 
+                config_file, 
+                rho=1025, 
+                g=9.81,
+                dof=6,
+                depth = 100,
+                deep_water=True):
         with open(config_file, 'r') as f:
             vessel_params = json.load(f)
         self._N = wave_amps.shape[0]
@@ -56,10 +66,13 @@ class WaveLoad:
         self._freqs = freqs
         self._eps = eps
         self._angles = angles
+        self._depth = depth
         self._qtf_angles = np.asarray(vessel_params['headings'])
         self._params = vessel_params
         self._g = g
         self._k = freqs**2/g
+        if not deep_water:
+            self._k = self.wave_number(self._freqs)
         self._rho = rho
         self._W = freqs[:, None] - freqs
         self._P = eps[:, None] - eps
@@ -207,3 +220,18 @@ class WaveLoad:
         Q[2] = np.zeros_like(Q[0])
         return Q
         
+    def wave_number(self, omega, tol=1e-5):
+        k = np.zeros(self._N)
+        for i, w in enumerate(omega):
+            k_old = w**2/self._g
+            k_new = w**2/(self._g * np.tanh(k_old * self._depth))
+            diff = np.abs(k_old - k_new)
+            count = 0
+            while diff > tol:
+                k_old = k_new
+                k_new = w**2/(self._g * np.tanh(k_old * self._depth))
+                diff = np.abs(k_old - k_new)
+                count += 1
+            k[i] = k_new
+            print(count)
+        return k
