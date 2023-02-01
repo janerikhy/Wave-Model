@@ -14,7 +14,7 @@ plt.rcParams.update({
 })
 
 # Simulation parameters
-simtime = 580
+simtime = 700
 dt = 0.01
 t = np.arange(0, simtime, dt)
 
@@ -33,9 +33,9 @@ ref_model = WayPointsRefModel(wps, slope=0.8, ds=0.1)
 # Vessel simulation model with Runge-Kutta 4 integration method.
 vessel = CSADMan3DOF(dt, method="RK4")
 
-# Vessel control model
-Mobs = vessel._M
-Dobs = vessel._D
+# Vessel control model matrices
+Mobs = vessel._M.diagonal()
+Dobs = vessel._D.diagonal()
 
 # Backstepping controller
 
@@ -49,8 +49,7 @@ theta = 0
 ss_dot = np.zeros(len(t))
 uss = np.zeros_like(ss_dot)
 
-u_ref = .15
-u_d = np.linspace(0, u_ref, len(t))
+u_ref = .05     # Reference speed
 
 # Create a sinus desired speed
 u_d = u_ref*np.sin(2*np.pi*1/(2*simtime)*t)
@@ -58,6 +57,7 @@ u_d = u_ref*np.sin(2*np.pi*1/(2*simtime)*t)
 #u_d_dot = (u_d[1] - u_d[0])/dt
 mu = 2e-6
 
+# Store the desired path
 desired_path = np.zeros((3, len(t)))
 desired_path[:, 0] = eta_d = np.array([ref_model.pd(0)[0], ref_model.pd(0)[1], np.arctan2(ref_model.pd_s(0)[1], ref_model.pd_s(0)[0])])
 
@@ -75,7 +75,7 @@ for i in range(1, len(t)):
                 eta_d_s2[1])/(eta_d_s[0]**2 + eta_d_s[1]**2)**(3/2)*u_ref
     tau = control.u(vessel.get_eta(), vessel.get_nu(), eta_d,
                     eta_d_s, eta_d_s2, mu, u_s, u_s_dot, ddt_u_s)
-    tau = np.clip(tau, -40, 40)
+    tau = np.clip(tau, -40, 40) # saturate the allowed commaned load
     ss_dot[i] = control._s_dot
     vessel.integrate(0.0, 0.0, tau)
     eta[i] = vessel.get_eta()
