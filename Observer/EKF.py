@@ -15,7 +15,7 @@ class EKF(Observer):
         nu      (3DOF)
     ]
     '''
-    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15,15))):
+    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.eye(15)):
         '''
         Initialization:
 
@@ -24,9 +24,11 @@ class EKF(Observer):
             - M: Inertia matrix of system (including added mass)
             - D: Full damping matrix of system
         '''
+        self._dt = dt
+
         # Tuning
-        self._Qd = np.eye(6)
-        self._Qd = np.array([
+        # self._Qd = np.eye(6)
+        self._Qd = 10 * np.array([
             [1,0,0,0,0,0],
             [0,1,0,0,0,0],
             [0,0,0.2*np.pi/180,0,0,0],
@@ -34,8 +36,8 @@ class EKF(Observer):
             [0,0,0,0,1e2,0],
             [0,0,0,0,0,1e3]
         ])
-        self._Rd = np.eye(3)
-        self._Rd = np.array([
+        # self._Rd = np.eye(3)
+        self._Rd = 0.001* np.array([
             [1,0,0],
             [0,1,0],
             [0,0,np.pi/180]
@@ -47,30 +49,26 @@ class EKF(Observer):
         self._Minv = np.linalg.inv(M)
         D = D[i]
         self._D = D
-        self._H, self._B, self._E, self._Aw = 0,0,0,0
+        self._H, self._B, self._E, self._Aw, self._gamma = 0,0,0,0,0
         self.initialize_constant_matrices()
         
-        
-
-        self._dt = dt
-
-        self._DOF = 3
+        # self._DOF = 3
 
         self._xhat = np.zeros(15)
         self._xbar = x0
 
         self._Pbar = P0
-        self._Phat = np.zeros((15,15))
+        self._Phat = np.eye(15)
 
     def predictor(self, tau):
         '''
         Documentation
         '''
         phi = self.state_function_jacobian()
-        gamma = self.state_function_noise_jacobian()
+        # gamma = self.state_function_noise_jacobian()
         f = self.state_function(self._xhat, tau, np.zeros(6))
 
-        self._Pbar = phi@self._Phat@phi.T + gamma@self._Qd@gamma.T
+        self._Pbar = phi@self._Phat@phi.T + self._gamma@self._Qd@self._gamma.T
         self._xbar = self._xhat + self._dt * f
 
 
@@ -78,23 +76,23 @@ class EKF(Observer):
         '''
         Documentation
         '''
-        H = self.measurement_function_jacobian()
-        K = self.EKF_gain(H)
+        #H = self.measurement_function_jacobian()
+        K = self.EKF_gain
 
-        parenthesis = np.eye(15) - K@H
+        parenthesis = np.eye(15) - K@self._H
 
         self._Phat = parenthesis@self._Pbar@parenthesis.T + K@self._Rd@K.T
-        self._xhat = self._xbar + K @(y - H@self._xbar)
+        self._xhat = self._xbar + K @(y - self._H@self._xbar)
         
 
 
-
-    def EKF_gain(self, H):
+    @property
+    def EKF_gain(self):
         '''
         Documentation
         '''
-        a = H@self._Pbar@H.T + self._Rd
-        K = self._Pbar@H.T@np.linalg.inv(a)
+        a = self._H@self._Pbar@(self._H.T) + self._Rd
+        K = self._Pbar@(self._H.T)@np.linalg.inv(a)
         return K
 
 
@@ -165,36 +163,38 @@ class EKF(Observer):
 
 
 
-    def state_function_noise_jacobian(self):
-        '''
-        Documentation
-        '''
-        gamma = self._dt * self._E
-        return gamma
+#    def state_function_noise_jacobian(self):
+#        '''
+#        Documentation
+#        '''
+#        gamma = self._dt * self._E
+#        return gamma
 
-    def measurement_function(self, x):                          # h(x,u)
-        '''
-        y = h(x,u)
-        '''
-        h = self._H @ x
-        raise h
+#    def measurement_function(self, x):                          # h(x,u)
+#        '''
+#        y = h(x,u)
+#
+#        IKKE I BRUK
+#        '''
+#        h = self._H @ x
+#        raise h
 
-    def measurement_function_jacobian(self):                    # dh/dx
-        '''
-        H = [ dh(x,u) / dx ]_(x=x_hat) = h
-
-        !!! NOT NECESSARY TO USE !!!
-        '''
-        H = self._H
-        return H
+#    def measurement_function_jacobian(self):                    # dh/dx
+#        '''
+#        H = [ dh(x,u) / dx ]_(x=x_hat) = h
+#
+#        !!! NOT NECESSARY TO USE !!!
+#        '''
+#        H = self._H
+#        return H
 
     def initialize_constant_matrices(self):
         '''
         x_dot = f(x,u,w) 
         '''
         # Aw
-        Tp = 9
-        omega = 2*np.pi/Tp # afjdfasdfdasfsfasdf!!!!!!!!!!!!!!!!!!!!!!!!!
+        Tp = 1e4    # Wave period
+        omega = 2*np.pi/Tp
         zeta = 0.05
         Aw1 = np.zeros((3,3))
         Aw2 = np.eye(3)
@@ -209,7 +209,11 @@ class EKF(Observer):
         Eb = np.eye(3)
         self._E[3:6,0:3] = Ew 
         self._E[9:12,3:6] = Eb
- 
+
+        # Gamma
+        self._gamma = self._dt * self._E
+
+
         # H
         self._H = np.zeros((3,15))
         self._H[0:3,3:6] = np.eye(3)
@@ -219,6 +223,7 @@ class EKF(Observer):
         self._B = np.zeros((15,3))
         self._B[12:15, 0:3] = self._Minv
         
+
     def get_xhat(self):
         return super().get_xhat()
 
