@@ -27,7 +27,6 @@ class EKF(Observer):
         self._dt = dt
 
         # Tuning
-        # self._Qd = np.eye(6)
         self._Qd = 10 * np.array([
             [1,0,0,0,0,0],
             [0,1,0,0,0,0],
@@ -36,13 +35,13 @@ class EKF(Observer):
             [0,0,0,0,1e2,0],
             [0,0,0,0,0,1e3]
         ])
-        # self._Rd = np.eye(3)
-        self._Rd = 0.001* np.array([
+        self._Qd = np.eye(6) *.1
+        self._Rd = 0.5**2* np.array([
             [1,0,0],
             [0,1,0],
-            [0,0,np.pi/180]
+            [0,0,1]
         ])
-
+        self._Rd = np.eye(3)
         # Constant matrices
         i = np.ix_([0,1,5],[0,1,5])     # Extract surge-sway-yaw DOFs
         M = M[i]
@@ -111,7 +110,7 @@ class EKF(Observer):
             (self._Aw@xi),
             (Rz(psi)@nu),
             np.zeros(3),
-            (-self._Minv@self._D@nu - self._Minv@Rz(psi).T@b)
+            (-self._Minv@self._D@nu + self._Minv@(Rz(psi).T)@b)     # plus or minus in 2nd term?
             ]
         )
         Ax = np.concatenate(Ax1)
@@ -193,7 +192,7 @@ class EKF(Observer):
         x_dot = f(x,u,w) 
         '''
         # Aw
-        Tp = 1e4    # Wave period
+        Tp = 1e7    # Wave period
         omega = 2*np.pi/Tp
         zeta = 0.05
         Aw1 = np.zeros((3,3))
@@ -205,7 +204,7 @@ class EKF(Observer):
 
         # E
         self._E = np.zeros((15,6))
-        Ew = np.diag([1,1,1]) 
+        Ew = np.diag([1,1,1])*.01
         Eb = np.eye(3)
         self._E[3:6,0:3] = Ew 
         self._E[9:12,3:6] = Eb
@@ -228,10 +227,14 @@ class EKF(Observer):
         return super().get_xhat()
 
 '''
-Yet to do:
-    - Implement state function
-    - Implement jacobians
-    - Discretize (phi and gamma)
-    - Vessel object as input?
+"Tuning factors":
+    - Q and R
+    - Tp in A_w
+    - diag(Kw,Kw,Kw) in E
+    - Eb in E
+    - zeta in A_w
+    - Adjustment of noise
+    - Time step
+    - Initial values
 
 '''
