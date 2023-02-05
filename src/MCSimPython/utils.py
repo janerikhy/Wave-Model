@@ -23,6 +23,10 @@ def pipi(theta):
     return np.mod(theta + np.pi, 2*np.pi) - np.pi
 
 
+def to_positive_angle(theta):
+    return np.where(theta < 0, theta + 2*np.pi, theta)
+
+
 def pipi2cont(psi, psi_prev):
     """Lifting algorithm."""
     arr = np.array([psi_prev, psi])

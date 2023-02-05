@@ -7,7 +7,7 @@ import os
 cwd = os.getcwd()
 sys.path.insert(0, cwd)
 
-from MCSimPython.utils import Rz, Ry, Rx, Rzyx, J
+from MCSimPython.utils import Rz, Ry, Rx, Rzyx, J, to_positive_angle
 
 
 class TestKinematicUtils:
@@ -50,3 +50,15 @@ class TestKinematicUtils:
         eta_dot = np.array([0., 1., 0., 0., 0., 0.])
         
         assert np.all(np.isclose(eta_dot, J(eta)@nu, rtol=1e-6))
+
+    def test_positive_angle_map(self):
+        angle = -np.pi / 2  # corresponding to 270 degrees (3pi/2)
+        pos_angle = to_positive_angle(angle)
+        true_angle = 3*np.pi / 2
+        assert np.equal(pos_angle, true_angle)
+
+    def test_array_positive_angle_map(self):
+        angles = np.array([-np.pi, -np.pi/2])
+        pos_angles = to_positive_angle(angles)
+        true_angles = np.array([np.pi, 3*np.pi/2])
+        assert np.all(np.isclose(pos_angles, true_angles, rtol=1e-6))
