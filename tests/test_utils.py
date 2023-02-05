@@ -7,7 +7,7 @@ import os
 cwd = os.getcwd()
 sys.path.insert(0, cwd)
 
-from utils import Rz, Ry, Rx, Rzyx, J
+from MCSimPython.utils import Rz, Ry, Rx, Rzyx, J
 
 
 class TestKinematicUtils:
