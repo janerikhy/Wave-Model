@@ -1,7 +1,7 @@
 # Module for computing wave loads on vessel
 import numpy as np
 import json
-from MCSimPython.utils import timeit
+from MCSimPython.utils import to_positive_angle
 
 class WaveLoad:
     """Class for computation of wave loads on floating structure. Both 
@@ -102,7 +102,7 @@ class WaveLoad:
             self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
             self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
-    def first_order_loads(self, t, rel_angle, eta):
+    def first_order_loads(self, t, eta):
         """
         Calculate first order wave-loads by super position of 
         wave load from each individual wave component.
@@ -124,10 +124,11 @@ class WaveLoad:
         tau_wf : 6x1 array
             First order wave-frequency load for each DOF.
         """
-        
+        rel_angle = self._relative_incident_angle(eta[-1])
         heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle[:, None])), axis=1)
-        #heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
+
         freq_ind = np.arange(0, self._N)
+
         # Select RAO for given relative wave angle.
         rao_amp = self._forceRAOamp[:, freq_ind, heading_index]
         rao_phase = self._forceRAOphase[:, freq_ind, heading_index]
@@ -146,7 +147,7 @@ class WaveLoad:
 
         return tau_wf
 
-    def second_order_loads(self, t, rel_angle):
+    def second_order_loads(self, t, heading):
         """
         Calcualation of second order drift loads.
 
@@ -156,9 +157,9 @@ class WaveLoad:
         Parameters:
         -----------
         t : float
-            Time
-        rel_anlge: float
-            Relative incident wave angle
+            Time.
+        heading: float
+            Vessel heading in NED-frame.
 
         Return:
         -------
@@ -167,12 +168,15 @@ class WaveLoad:
 
         References
         ----------
-        [Newman 1974] INSERT HER
-        [Standing, Brendling and Wilson]
+        .. [1] J. N. Newman. Marine hydrodynamics / J. N. Newman. MIT Press Cambridge, Mass, 1977. ISBN
+           0262140268.
         """
 
+        # Use the mean relative angle to compute the slowly-varying loads
+        rel_angle = np.mean(self._relative_incident_angle(heading))
+
         # Get the QTF matrix for the given heading for each DOF.
-        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle)))
+        heading_index = np.argmin(np.abs(self._qtf_angles - rel_angle))
         Q = self._Q[:, heading_index, :, :]
 
         tau_sv = np.real(self._amp@(Q*np.exp(self._W*(1j*t) + 1j*self._P))@self._amp)
@@ -180,8 +184,7 @@ class WaveLoad:
         return tau_sv
 
     def _full_qtf_6dof(self, qtf_headings, qtf_freqs, qtfs, method="Newman"):
-        """
-        Generate the full QTF matrix for all DOF, all headings with calculated QTF
+        """Generate the full QTF matrix for all DOF, all headings with calculated QTF
         and for all wave frequency components.
 
         VERES ONLY CALCULATES DRIFT FORCES FROM SURGE SWAY AND YAW. THEREFOR THE REMAINING
@@ -206,7 +209,6 @@ class WaveLoad:
         """
         
         freq_indices = [np.argmin(np.abs(qtf_freqs - freq)) for freq in self._freqs]
-        print(len(freq_indices))
         Q = np.zeros((6, len(qtf_headings), self._N, self._N))
 
         for dof in range(6):
@@ -221,6 +223,22 @@ class WaveLoad:
         return Q
         
     def wave_number(self, omega, tol=1e-5):
+        """Wave number of wave components.
+        Calculate the wave number using the dispersion relation. The wave number
+        is calculated through an iterative scheme. 
+
+        Parameters:
+        -----------
+        omega : array_like
+            1D array of wave frequencies in rad.
+        tol : float
+            Tolerance used in the iteration to define when the solution converge.
+
+        Returns:
+        --------
+        k : array_like
+            1D array of wave numbers.
+        """
         k = np.zeros(self._N)
         for i, w in enumerate(omega):
             k_old = w**2/self._g
@@ -235,3 +253,22 @@ class WaveLoad:
             k[i] = k_new
             print(count)
         return k
+
+    def _relative_incident_angle(self, heading):
+        """The relative wave incident angle gamma.
+
+        Calculate the relative angle for each wave component. 
+        Gamma = 0.0 is defined as following sea, gamma = 180 as head sea, and gamma = 90 as beam sea.
+
+        Parameters:
+        -----------
+        
+        heading : float
+            Heading of the vessel
+        
+        Returns:
+        --------
+        gamma : array_like
+            Array of relative incident wave angles.
+        """
+        return to_positive_angle(self._angles - heading)
