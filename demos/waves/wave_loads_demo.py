@@ -51,7 +51,7 @@ wave_load = WaveLoad(
     eps,
     wave_angles,
     config_file=vessel._config_file,
-    depth=1.5*1e3,
+    depth=1.5,
     deep_water=False
 )
 
