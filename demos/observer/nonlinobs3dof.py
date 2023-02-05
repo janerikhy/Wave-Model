@@ -104,9 +104,8 @@ for i in range(1, len(t)):
     x_r[i] = ref_model._x
 
     # Calculate the first order wave loads
-    rel_angle = wave_dir - psi
-    tau_wf = waveload.first_order_loads(t[i], rel_angle, vessel.get_eta())[dof3_array]
-    tau_sv = waveload.second_order_loads(t[i], rel_angle[0])
+    tau_wf = waveload.first_order_loads(t[i], vessel.get_eta())[dof3_array]
+    tau_sv = waveload.second_order_loads(t[i], vessel.get_eta()[-1])
 
     # tau_wf = np.zeros(3)
     # Compute the tau_cmd
