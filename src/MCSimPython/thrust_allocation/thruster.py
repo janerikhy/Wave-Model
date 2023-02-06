@@ -21,6 +21,13 @@ class Thruster:
         y-position of thruster
         """
         return self._r[1]
+    
+    @property
+    def K(self):
+        """
+        thrust coefficient of thruster
+        """
+        return self._K
 
 
 class TunnelThruster(Thruster):
