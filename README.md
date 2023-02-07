@@ -1,57 +1,40 @@
-# Wave-Model
-Wave model simulator used in master project and master thesis
+# MCSimPython
 
+Vessel simulator used in master project and master thesis of M. Kongshaug, H. Mo and J. Hygen. The project is developed at Norwegian University of Science and Technology, Institue of Marine Technology. 
 
-## Previous work
-The simulator will be based on the work of ...... and Brørby 2021/2022. 
+The python package is not complete and there is no guarantee for the validity of the vessel models.
 
-## Tips
+All code implementation is found in the `src` directory. The python package is structured as follows:
 
-### Setup virtual environment and install dependencies
+- `src/MCSimPython/simulator/` Simulation Models. *Python Path*:= `MCSimPython.simulator`
+    - `csad.py`: Simulation models for C/S Arctic Drillship
+    - `gunnerus.py`: Simulation models for R/V Gunnerus
+- `src/MCSimPython/waves/` Wave kinematics, wave spectra, and wave loads. *Python Path* := `MCSimPython.waves`
+- `src/MCSimPython/guidance/` Reference Models. *Python path*:= `MCSimPython.guidance` *(in development)*
+    - `filter.py`: A third order reference filter.
+    - `path_param`: Waypoint path parameterization.
+- `src/MCSimPython/observers/` Observers : `MCSimPython.observer` *(in development)*
+    - `nonlinobs.py`: Nonlinear observers *(only 3DOF nonlinobs w/ wavefiltering atm)*
+- `src/MCSimPython/control` Controllers : `MCSimPython.control` *(in development)*
+    - `basic.py`: Simple PD and PID controllers
+    - `backstepping.py`: A simple backstepping controller (no bias compensation).
 
-Create a virtual environment e.g `py -m venv name-of-venv`.
+## How to use MCSimPython
 
-Install required dependencies by running: `pip install -r requirements.txt`
-
-### Relative Imports
-
-When running different scripts you might encounter problems due to relative imports of packages/modules. This will typically be "No module named wave_spectra" etc. 
-This has to do with how python looks for modules. 
-
-In this directory, the modules wave_loads, wave_spectraw, and wave_sim are all in the base directory WAVEMODEL. To make sure that these modules can be found, we have to add this directory to the PYTHONPATH variable. You can check which directories python looks for packages by:
-
+- Clone the GitHub repository to your local computer.
+- Create a virtual environment `py -m venv name-of-venv`
+- Activate virtual environment `name-of-venv\scripts\activate`
+- Update pip and setuptools: `py -m pip install --upgrade pip setuptools`
+- Install the python package locally as an editable: `pip install -e .`
+- Verify that the python package `MCSimPython` has been installed properly by running a demo script, or simply
 ```
->>> import sys
->>> print(sys.path)
+(venv) C:\path\to\dir> python
+>>> import MCSimPython
+>>>
 ```
 
-To ensure that the correct base directory `some\\path\\Wave-Model` can be found - we can add it to our virtual environment (e.g venv). Add a .pth file like `wavemodel.pth` in venv\Lib\site-packages containing the full path to the directory e.g:
 
-```
-wavemodel.pth
--------------
+## Demos
 
-c:\Users\your_user\full_path\Wave-Model
-```
+Demonstration of how the individual components of the python package can be used is given in `demos`. Some demos of combination of the different components are also given here. 
 
-The structure should look like:
-
-```
-some_folder
-|___Wave-Model
-|   |
-|   |___Readme.md
-|   |___demos/
-|   |___simulator/
-|   |___waves/
-|   |___requirements.txt
-|   |___ ...
-|
-|___name-of-venv
-|   |
-|   |___Lib
-|       |
-|       |___site-packages
-|           |___wavemodel.pth
-|           |___ ...
-```
