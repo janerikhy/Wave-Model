@@ -1,10 +1,9 @@
 import numpy as np
-from observer import Observer
 
 from utils import Rz, pipi
 
 
-class EKF(Observer):
+class EKF():
     '''
     Implementation of Extended Kalman Filter (EKF) for CSAD.
 
@@ -192,7 +191,7 @@ class EKF(Observer):
             - N/A
         Output:
             - phi: Discretized jacobian of system dynamics (Dim = 15x15)
-            
+
         To be implemented / Improvements:
             - 
         '''
