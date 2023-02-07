@@ -143,6 +143,50 @@ class CSAD_DP_6DOF(Vessel):
         nu_dot = self._Minv@(tau - self._D@nu_r - self._G@eta) #- self._G@Jinv@eta)
         #self._x_dot = np.concatenate([eta_dot, nu_dot])
         return np.concatenate([eta_dot, nu_dot])
+    
+    def set_hydrod_parameters(self, freq):
+        """Set the hydrodynamic added mass and damping for a given frequency.
+        
+        Parameters:
+        -----------
+        freq : array_like
+            Frequency in rad/s. Can either be a single frequency, or 
+            multiple frequencies with dimension n = DOF. 
+
+        Examples
+        --------
+        # Set a hydrodynamic parameters for one frequency
+        >>> dt = 0.01
+        >>> model = CSAD_DP_6DOF(dt)
+        >>> frequency = 2*np.pi
+        >>> model.set_hydrod_parameters(frequency)
+
+        Set frequency for individual components
+        >>> freqs = [0., 0., 2*np.pi, 2*np.pi, 2*np.pi, 0.]
+        >>> model.set_hydrod_parameters(freqs)
+        """
+        
+        if type(freq) not in [list, np.ndarray]:
+            freq = [freq]
+        freq = np.asarray(freq)
+        print(freq.shape)
+        if (freq.shape[0] > 1) and (freq.shape[0] != self._dof):
+            raise ValueError(f"Argument freq: {freq} must either be a float or have shape n = {self._dof}. \
+                             freq.shape = {freq.shape} != {self._dof}.")
+        with open(self._config_file, 'r') as f:
+            param = json.load(f)
+
+        freqs = np.asarray(param['freqs'])
+        if freq.shape[0] == 1:
+            freq_indx = np.argmin(np.abs(freqs - freq))
+        else:
+            freq_indx = np.argmin(np.abs(freqs - freq[:, None]), axis=1)
+        all_dof = np.arange(6)
+        self._Ma = np.asarray(param['A'])[:, all_dof, freq_indx]
+        self._Dp = np.asarray(param['B'])[:, all_dof, freq_indx]
+        self._M = self._Mrb + self._Ma
+        self._Minv = np.linalg.inv(self._M)
+        self._D = self._Dv + self._Dp
 
 
 # class CSAD6DOF(Vessel):
