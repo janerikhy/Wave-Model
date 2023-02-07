@@ -130,31 +130,7 @@ class WaveLoad:
         """
         rel_angle = self._relative_incident_angle(eta[-1])
 
-        # Creating an interpolation scheme to find the correct rao
-        # this can be made as a function if it works correctly.
-
-        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle[:, None])), axis=1)
-        index_lb = np.argmin(np.abs(np.rad2deg(self._qtf_angles) - np.floor(np.rad2deg(rel_angle[:, None])/10)*10), axis=1)
-        index_ub = index_lb + 1 if index_lb < 35 else 0
-
-        freq_ind = np.arange(0, self._N)
-        
-        rao_amp_lb = self._forceRAOamp[:, freq_ind, index_lb]
-        rao_phase_lb = self._forceRAOphase[:, freq_ind, index_lb]
-
-        rao_amp_ub = self._forceRAOamp[:, freq_ind, index_ub]
-        rao_phase_ub = self._forceRAOphase[:, freq_ind, index_ub]
-
-        theta1, theta2 = self._qtf_angles[index_lb], self._qtf_angles[index_ub]
-        scale = pipi(rel_angle - theta1)/pipi(theta2 - theta1)
-        # Ensure that diff theta1 and theta2 is the smallest signed angle
-        rao_amp = rao_amp_lb + (rao_amp_ub - rao_amp_lb)*scale
-        rao_phase = rao_phase_lb + (rao_phase_ub - rao_phase_lb)*scale
-
-
-        # Select RAO for given relative wave angle.
-        # rao_amp = self._forceRAOamp[:, freq_ind, heading_index]
-        # rao_phase = self._forceRAOphase[:, freq_ind, heading_index]
+        rao_amp, rao_phase = self._rao_interp(rel_angle)
     
         # Horizontal position of vessel (N, E).
         x = eta[0]
@@ -295,3 +271,22 @@ class WaveLoad:
             Array of relative incident wave angles.
         """
         return to_positive_angle(pipi(self._angles - heading))
+
+    def _rao_interp(self, rel_angle):
+        index_lb = np.argmin(np.abs(np.rad2deg(self._qtf_angles) - np.floor(np.rad2deg(rel_angle[:, None])/10)*10), axis=1)
+        index_ub = index_lb + 1 if index_lb < 35 else 0
+
+        freq_ind = np.arange(0, self._N)
+        
+        rao_amp_lb = self._forceRAOamp[:, freq_ind, index_lb]
+        rao_phase_lb = self._forceRAOphase[:, freq_ind, index_lb]
+
+        rao_amp_ub = self._forceRAOamp[:, freq_ind, index_ub]
+        rao_phase_ub = self._forceRAOphase[:, freq_ind, index_ub]
+
+        theta1, theta2 = self._qtf_angles[index_lb], self._qtf_angles[index_ub]
+        scale = pipi(rel_angle - theta1)/pipi(theta2 - theta1)
+        # Ensure that diff theta1 and theta2 is the smallest signed angle
+        rao_amp = rao_amp_lb + (rao_amp_ub - rao_amp_lb)*scale
+        rao_phase = rao_phase_lb + (rao_phase_ub - rao_phase_lb)*scale
+        return rao_amp, rao_phase
