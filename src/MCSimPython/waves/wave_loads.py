@@ -274,7 +274,7 @@ class WaveLoad:
 
     def _rao_interp(self, rel_angle):
         index_lb = np.argmin(np.abs(np.rad2deg(self._qtf_angles) - np.floor(np.rad2deg(rel_angle[:, None])/10)*10), axis=1)
-        index_ub = index_lb + 1 if index_lb < 35 else 0
+        index_ub = np.where(index_lb < 35, index_lb + 1, 0)
 
         freq_ind = np.arange(0, self._N)
         
