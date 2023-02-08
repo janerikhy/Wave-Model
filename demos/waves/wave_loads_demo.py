@@ -12,7 +12,7 @@ fig_width = width*inch_pr_pt
 fig_height = fig_width*golden_ratio
 fig_size = [fig_width, fig_height]
 
-params = {'backend': 'PS',
+params = {#'backend': 'PS',
           'axes.labelsize': 10,
           'font.size': 10,
           'legend.fontsize': 10,
@@ -26,8 +26,8 @@ plt.rcParams.update(params)
 
 vessel = CSAD_DP_6DOF(0.01)
 
-N = 1       # Number of wave components
-relative_angle = np.deg2rad(180)
+N = 3       # Number of wave components
+heading = 0
 np.random.seed(1)
 
 if N == 1:
@@ -40,12 +40,33 @@ elif N == 2:
 
 elif N == 3:
     wave_amps = np.array([0.5, 1.0, 0.8])
-    wave_freqs = np.array([0.4, 0.3, 0.7])
+    wave_freqs = np.array([0.4, 0.25, 0.7])
 
 eps = np.random.uniform(0, 2*np.pi, size=N)
-wave_angles = np.zeros(N)
+wave_angles = np.ones(N)*(-np.pi/2)
 
-wave_load = WaveLoad(wave_amps, wave_freqs, eps, wave_angles, config_file=vessel._config_file)
+wave_load = WaveLoad(
+    wave_amps,
+    wave_freqs,
+    eps,
+    wave_angles,
+    config_file=vessel._config_file,
+    depth=1.5,
+    deep_water=False
+)
+
+wl2 = WaveLoad(
+    wave_amps,
+    wave_freqs,
+    eps,
+    wave_angles,
+    config_file=vessel._config_file,
+    depth=1.5*1e3,
+    deep_water=True
+)
+
+print(wave_load._k)
+print(wl2._k)
 
 dt = 0.01
 time = np.arange(0, 200, dt)
@@ -55,8 +76,8 @@ tau_wf_2 = np.zeros_like(tau_wf_1)
 
 
 for i in range(len(time)):
-    tau_wf_1[i] = wave_load.first_order_loads(time[i], relative_angle, vessel.get_eta())
-    tau_wf_2[i] = wave_load.second_order_loads(time[i], relative_angle)
+    tau_wf_1[i] = wave_load.first_order_loads(time[i], vessel.get_eta())
+    tau_wf_2[i] = wave_load.second_order_loads(time[i], vessel.get_eta()[-1])
 
 
 
@@ -70,7 +91,7 @@ for i in range(len(time)):
 
 # Plot 1st order wave loads
 fig, axs = plt.subplots(3, 1, constrained_layout=True)
-fig.suptitle("1st Order Wave Loads" + f", $\gamma = {np.rad2deg(relative_angle)}$")
+fig.suptitle("1st Order Wave Loads" + r", $\beta " + f"= {np.rad2deg(wave_angles[0])}$")
 
 plt.sca(axs[0])
 plt.title("Surge")
@@ -97,7 +118,7 @@ plt.ylabel(r"$\tau_{sv}^6 \; [Nm]$")
 
 # Plot 2nd Order Wave Loads
 fig, axs = plt.subplots(3, 1, sharex=True)
-fig.suptitle("2nd Order Wave Loads" + f", $\gamma = {np.rad2deg(relative_angle)}$")
+fig.suptitle("2nd Order Wave Loads" + r", $\beta " + f"= {np.rad2deg(wave_angles[0])}$")
 
 plt.sca(axs[0])
 plt.plot(time, tau_wf_2[:, 0])
@@ -142,5 +163,5 @@ plt.xlabel("$t \; [s]$")
 plt.legend(ncol=3)
 plt.xlim(time[0], time[-1])
 plt.ylim(-0.05, 0.05)
-plt.savefig(f"2nd_wave_loads_and_realization_N{N}.eps")
-#plt.show()
+#plt.savefig(f"2nd_wave_loads_and_realization_N{N}.eps")
+plt.show()

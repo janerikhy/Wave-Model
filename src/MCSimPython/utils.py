@@ -3,6 +3,9 @@ import numpy as np
 from time import time
 
 
+dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
+dof3_array = np.ix_([0, 1, 5])
+
 def complex_to_polar(complex_values):
     complex_values = np.asarray_chkfinite(complex_values)
     amp = np.abs(complex_values)
@@ -18,6 +21,10 @@ def polar_to_complex(amp, theta):
 
 def pipi(theta):
     return np.mod(theta + np.pi, 2*np.pi) - np.pi
+
+
+def to_positive_angle(theta):
+    return np.where(theta < 0, theta + 2*np.pi, theta)
 
 
 def pipi2cont(psi, psi_prev):
