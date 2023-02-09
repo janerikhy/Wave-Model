@@ -1,6 +1,6 @@
 import numpy as np
 
-from MCSimPython.utils import Rz, pipi
+from MCSimPython.utils import Rz, pipi, six2threeDOF
 
 
 class EKF():
@@ -51,7 +51,6 @@ class EKF():
 
         # Constant matrices
         i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
-
         M = M[i]
         self._Minv = np.linalg.inv(M)                                       # 3DOF inverted mass matrix
         self._D = D[i]                                                      # 3DOF damping matrix
@@ -66,7 +65,27 @@ class EKF():
 
         self._Pbar = np.zeros((15,15))      #P0
         self._Phat = np.zeros((15,15))
+    
+    
+      
+    def update(self, tau, y):
+        '''
+        Update function to be called at every timestep during a simulation
 
+
+        Inputs:
+            - tau: Control inputs (3DOF)
+            - y: Measured position (3DOF)
+
+        To be implemented / Improvements:
+            - 
+        '''
+        # Predict        
+        self.predictor(tau)
+        # Correct
+        self.corrector(y)
+
+    
     def predictor(self, tau):
         '''
         Predictor:
@@ -292,7 +311,13 @@ class EKF():
         # B
         self._B = np.zeros((15,3))
         self._B[12:15, 0:3] = self._Minv
-        
+    
+
+    def set_tuning_matrices(self, Q, R):
+        self._Qd = Q
+        self._Rd = R
+    
+
     @property
     def x_hat(self):
         return self._xhat
