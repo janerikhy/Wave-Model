@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from thruster import Thruster
+from MCSimPython.thrust_allocation.thruster import Thruster
 from itertools import repeat
 import numpy as np
 
