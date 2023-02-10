@@ -54,6 +54,13 @@ class ThrdOrderRefFilter():
         return Rz(psi).T@self.eta_d_dot
 
     def set_eta_r(self, eta_r):
+        """Set the reference pose.
+        
+        Parameters
+        ----------
+        eta_r : array_like
+            Reference vessel pose in surge, sway and yaw.
+        """
         self._eta_r = eta_r
 
     def update(self):
