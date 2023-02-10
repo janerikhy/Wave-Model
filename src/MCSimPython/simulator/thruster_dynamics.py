@@ -63,7 +63,7 @@ class ThrusterDynamics:
 
         return signal_curr
 
-    def compute_n(self, u):
+    def propeller_revolution(self, u):
 
         """
         Calculates the propeller revolution number from the control signal.
@@ -87,7 +87,7 @@ class ThrusterDynamics:
 
         return n
     
-    def compute_u(self, n):
+    def control_input(self, n):
 
         """
         Calculates the the control input from the propeller revolution number.
@@ -111,7 +111,7 @@ class ThrusterDynamics:
 
         return u 
 
-    def compute_actuator_loads(self, u):
+    def actuator_loads(self, u):
 
         """
         Computes load on each actuator from the control inputs.
@@ -129,8 +129,30 @@ class ThrusterDynamics:
         """
         
         return self._K @ u
+    
+    def thruster_configuration(self, alpha):
 
-    def get_tau(self, actual_actuator_loads, actual_alpha):
+        """
+        Sets up the thrust configuration matrix.
+        
+        Parameters
+        -----------
+        alpha : array_like
+            Azimuth angles.
+
+        Returns
+        --------
+         : array_like
+            Thrust configuration matrix.
+        """
+
+        return np.array([
+            np.cos(alpha),
+            np.sin(alpha),
+            self._lx * np.sin(alpha) - self._ly * np.cos(alpha)
+        ])
+
+    def get_tau(self, u, alpha):
 
         """
         Computes resulting thrust and moments in surge, sway and yaw from the actuators.
@@ -144,18 +166,11 @@ class ThrusterDynamics:
 
         Returns
         --------
-        tau : array_like
+         : array_like
             Thrust and moments in surge, sway and yaw.
         """
 
-        
-        F_x = np.sum(actual_actuator_loads * np.cos(actual_alpha))
-        F_y = np.sum(actual_actuator_loads * np.sin(actual_alpha))
-        M_r = np.sum(self._lx * actual_actuator_loads * np.sin(actual_alpha)) - np.sum(self._ly * actual_actuator_loads * np.cos(actual_alpha))
-        
-        tau = np.array([F_x, F_y, M_r])
-
-        return tau
+        return self.thruster_configuration(alpha) @ self.actuator_loads(u)
 
 
 
