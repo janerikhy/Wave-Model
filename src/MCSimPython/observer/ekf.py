@@ -14,11 +14,11 @@ class EKF():
         nu      (3DOF)
     ]
     '''
-    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.eye(15)):
+    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15))):
         '''
         Initialization:
 
-        Input:
+        Params:
             - dt: Time step
             - M: Inertia matrix of system (including added mass) 6DOF
             - D: Full damping matrix of system 6DOF
@@ -34,18 +34,14 @@ class EKF():
             [0,0,0,0,5e2,0],
             [0,0,0,0,0,1e1]
         ])
-
         # Minke 3 første gir: mindre støy på vel + dårligere pos
         # Øke 3 siste gir bedre pos estimater, + mer støy på vel
         # Sånn ish...
-
-
         self._Rd = np.array([
             [100,0,0],
             [0,10,0],
             [0,0,500*np.pi/180]
         ])
-
         #self._Qd = np.eye(6)*.01
         #self._Rd = np.eye(3)
 
@@ -63,22 +59,24 @@ class EKF():
         self._xhat = np.zeros(15)
         self._xbar = x0
 
-        self._Pbar = np.zeros((15,15))      #P0
+        self._Pbar = P0
         self._Phat = np.zeros((15,15))
     
     
       
     def update(self, tau, y):
         '''
-        Update function to be called at every timestep during a simulation
-
+        Update:
+        Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
 
         Inputs:
             - tau: Control inputs (3DOF)
             - y: Measured position (3DOF)
 
         To be implemented / Improvements:
-            - 
+            - Error checks?
+            - Asynchronous measurements?
+            - Set y to nan if no measurement
         '''
         # Predict        
         self.predictor(tau)
@@ -324,7 +322,13 @@ class EKF():
     @property
     def P_hat(self):
         return self._Phat
-    
+    @property
+    def eta_hat(self):
+        return self._xhat[6:9]
+    @property
+    def nu_hat(self):
+        return self._xhat[12:15] 
+        
 
 '''
 "Tuning factors":
