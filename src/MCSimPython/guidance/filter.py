@@ -51,7 +51,7 @@ class ThrdOrderRefFilter():
     def get_nu_d(self):
         """Get desired velocity in body-frame."""
         psi = self.eta_d[-1]
-        return Rz(psi).T@self.eta_d
+        return Rz(psi).T@self.eta_d_dot
 
     def set_eta_r(self, eta_r):
         self._eta_r = eta_r
