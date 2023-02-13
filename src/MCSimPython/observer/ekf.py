@@ -1,6 +1,19 @@
-import numpy as np
 
-from MCSimPython.utils import Rz, pipi
+# ekf.py
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Mo, Kongshaug, Hygen
+# Created Date: 2023-02-13
+# Revised: N/A
+# Tested:  2023-02-13 Full test of observer performance. Tuning can be improved.
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
+# Imports
+import numpy as np
+from MCSimPython.utils import Rz, pipi, six2threeDOF
 
 
 class EKF():
@@ -14,11 +27,11 @@ class EKF():
         nu      (3DOF)
     ]
     '''
-    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.eye(15)):
+    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15,15))):
         '''
         Initialization:
 
-        Input:
+        Params:
             - dt: Time step
             - M: Inertia matrix of system (including added mass) 6DOF
             - D: Full damping matrix of system 6DOF
@@ -34,27 +47,23 @@ class EKF():
             [0,0,0,0,5e2,0],
             [0,0,0,0,0,1e1]
         ])
-
         # Minke 3 første gir: mindre støy på vel + dårligere pos
         # Øke 3 siste gir bedre pos estimater, + mer støy på vel
         # Sånn ish...
-
-
         self._Rd = np.array([
             [100,0,0],
             [0,10,0],
             [0,0,500*np.pi/180]
         ])
-
         #self._Qd = np.eye(6)*.01
         #self._Rd = np.eye(3)
 
         # Constant matrices
-        i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
-
-        M = M[i]
+        #i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
+        #M = M[i]
+        M = six2threeDOF(M)
         self._Minv = np.linalg.inv(M)                                       # 3DOF inverted mass matrix
-        self._D = D[i]                                                      # 3DOF damping matrix
+        self._D = six2threeDOF(D)                                           # 3DOF damping matrix
         
         self._H, self._B, self._E, self._Aw, self._gamma = 0,0,0,0,0
         self.initialize_constant_matrices()
@@ -64,15 +73,37 @@ class EKF():
         self._xhat = np.zeros(15)
         self._xbar = x0
 
-        self._Pbar = np.zeros((15,15))      #P0
+        self._Pbar = P0
         self._Phat = np.zeros((15,15))
+    
+    
+      
+    def update(self, tau, y):
+        '''
+        Update:
+        Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
 
+        Parameters:
+            - tau: Control Parameters (3DOF)
+            - y: Measured position (3DOF)
+
+        To be implemented / Improvements:
+            - Error checks?
+            - Asynchronous measurements?
+            - Set y to nan if no measurement
+        '''
+        # Predict        
+        self.predictor(tau)
+        # Correct
+        self.corrector(y)
+
+    
     def predictor(self, tau):
         '''
         Predictor:
         Used to estimate the state of the system at the next time step based on the current state estimate and the system dynamics model.
         
-        Inputs:
+        Parameters:
             - tau = [X, Y, N]',  Control input (3DOF)
 
         To be implemented / Improvements:
@@ -90,7 +121,7 @@ class EKF():
         Corrector:
         Used to refine the predicted state estimate from the predictor, based on the obtained measurements. The function checks for signal loss (no measurement).
 
-        Input:
+        Parameters:
             - y = [eta1  eta2  eta6]', Measurements (3DOF) 
 
         To be implemented / Improvements:
@@ -119,7 +150,7 @@ class EKF():
         Kalman gain:
         Used to balance the contributions of the predicted state estimate and the measurement data in the updated estimate.
 
-        Input:
+        Parameters:
             - N/A
         Output:
             - K: Kalman gain (Dim = 15x3)
@@ -143,7 +174,7 @@ class EKF():
             -M_inv*D * nu + M_inv*R(psi).T * b
         ]
 
-        Input:
+        Parameters:
             - x: state vector (Dim = 15)
             - tau: Control vector [X  Y  N]
             - noise: Modelled white noise, set to zero in a deterministic EKF. (Dim=6)
@@ -187,7 +218,7 @@ class EKF():
             row (4):        0_(3x6)     del_f4      M_inv*R(psi).T  -M_inv*D                
         ]   
 
-        Input:
+        Parameters:
             - N/A
         Output:
             - phi: Discretized jacobian of system dynamics (Dim = 15x15)
@@ -251,7 +282,7 @@ class EKF():
             M_inv
         ]
 
-        Input:
+        Parameters:
             - N/A
 
         To be implemented / Improvements:
@@ -292,14 +323,26 @@ class EKF():
         # B
         self._B = np.zeros((15,3))
         self._B[12:15, 0:3] = self._Minv
-        
+    
+
+    def set_tuning_matrices(self, Q, R):
+        self._Qd = Q
+        self._Rd = R
+    
+
     @property
     def x_hat(self):
         return self._xhat
     @property
     def P_hat(self):
         return self._Phat
-    
+    @property
+    def eta_hat(self):
+        return self._xhat[6:9]
+    @property
+    def nu_hat(self):
+        return self._xhat[12:15] 
+        
 
 '''
 "Tuning factors":

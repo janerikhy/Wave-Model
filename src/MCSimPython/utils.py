@@ -105,6 +105,25 @@ def Smat(x):
     ])
 
 
+def three2sixDOF(v):
+    if v.ndim == 2:   # Matrix
+        v = np.concatenate(v, axis=None)
+        v = np.concatenate((v[0:2], np.zeros(3), v[2:5], np.zeros(3), v[5], np.zeros(18), v[6:8], np.zeros(3), v[8]), axis=None).reshape((6,6))
+    elif v.ndim == 1: # Vector
+        v = np.array([v[0], v[1], 0, 0, 0, v[2]])
+    return v
+
+def six2threeDOF(v):
+    if v.ndim == 2:   # Matrix
+        i = np.ix_([0,1,5],[0,1,5])
+        v = v[i]  
+    elif v.ndim == 1: # Vector
+        i = np.ix_([0,1,5])  
+        v = v[i]
+    return v
+
+
+
 def timeit(func):
     """
     Decorator for measuring execution time of function.
