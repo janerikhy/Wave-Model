@@ -20,8 +20,8 @@ plt.rcParams.update({
 })
 
 # Sim parameters
-dt = 0.005
-N = 100000
+dt = 0.01
+N = 10000
 t = np.arange(0, dt*N, dt)
 np.random.seed(1234)
 
@@ -32,10 +32,10 @@ beta_u = 45         # deg
 
 
 # Sea state parameters
-N_w = 25              # Number of wave components
-hs = 0.03           # Significant wave height
-tp = 1.0            # Peak period
-wp = 2*np.pi/tp     # Peak frequency
+N_w = 25                # Number of wave components
+hs = 0.03               # Significant wave height
+tp = 1.0                # Peak period
+wp = 2*np.pi/tp         # Peak frequency
 wmin = wp/2
 wmax = 2.5*wp
 dw = (wmax-wmin)/N_w
@@ -53,9 +53,9 @@ wave_dir = np.ones(N_w)*np.deg2rad(170)
 
 
 # Create vessel, observer and wave loads objects
-vessel = CSAD_DP_6DOF(dt)                       # Vessel
-KalmanFilter = EKF(dt, vessel._M, vessel._D)    # Observer
-waveload = WaveLoad(wave_amps, w, eps, wave_dir, config_file=vessel._config_file)
+vessel = CSAD_DP_6DOF(dt)                                                           # Vessel
+KalmanFilter = EKF(dt, vessel._M, vessel._D)                                        # Observer
+waveload = WaveLoad(wave_amps, w, eps, wave_dir, config_file=vessel._config_file)   # Wave loads
 
 # Set up a very simple reference model and reference points
 eta_ref = np.zeros((N, 3))
@@ -177,7 +177,6 @@ for i in range(2):
         if DOF in [1,2,6]: 
             axs[i,j].plot(t, eta_hat[:,i_obs], label=r'$\eta_{obs} $ '+str(DOF))
             i_obs+=1
-            # axs[i,j].set_ylim([min(y[:, DOF-1]),max(y[:,DOF-1])])
         
         axs[i,j].legend(loc="upper right", edgecolor="k")
 plt.tight_layout()
@@ -258,6 +257,7 @@ plt.legend()
 plt.title('Covariance matrix trace')
 plt.ylim([0,100])
 plt.show()
+
 
 for i in range(15):
     if var[:,i][-1]-var[:,i][-5000]>5:
