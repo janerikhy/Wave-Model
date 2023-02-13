@@ -91,17 +91,17 @@ class RVG_DP_6DOF(Vessel):
         
         # Mass
         self._Mrb = np.asarray(data['MRB'])
-        self._Ma = np.asarray(data['A'])[:, :, 30]
+        self._Ma = np.asarray(data['A'])[:, :, 30, 0]
         self._M = self._Mrb + self._Ma
         self._Minv = np.linalg.inv(self._M)
 
         # Damping
-        self._Dp = np.asarray(data['B'])[:, :, 30]
+        self._Dp = np.asarray(data['B'])[:, :, 30, 0]
         self._Dv = np.asarray(data['Bv'])
         self._D = self._Dp + self._Dv
 
         # Restoring coefficients
-        self._G = np.asarray(data['C'])[:, :, 0]
+        self._G = np.asarray(data['C'])[:, :, 0, 0]
 
     def x_dot(self, x, Uc, betac, tau):
         """Kinematic and kinetic equations.
@@ -175,8 +175,8 @@ class RVG_DP_6DOF(Vessel):
         else:
             freq_indx = np.argmin(np.abs(freqs - freq[:, None]), axis=1)
         all_dof = np.arange(6)
-        self._Ma = np.asarray(param['A'])[:, all_dof, freq_indx]
-        self._Dp = np.asarray(param['B'])[:, all_dof, freq_indx]
+        self._Ma = np.asarray(param['A'])[:, all_dof, freq_indx, 0]
+        self._Dp = np.asarray(param['B'])[:, all_dof, freq_indx, 0]
         self._M = self._Mrb + self._Ma
         self._Minv = np.linalg.inv(self._M)
         self._D = self._Dv + self._Dp
