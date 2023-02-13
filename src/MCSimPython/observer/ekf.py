@@ -1,5 +1,18 @@
-import numpy as np
 
+# ekf.py
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Mo, Kongshaug, Hygen
+# Created Date: 2023-02-13
+# Revised: N/A
+# Tested:  2023-02-13 Full test of observer performance. Tuning can be improved.
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
+# Imports
+import numpy as np
 from MCSimPython.utils import Rz, pipi, six2threeDOF
 
 
@@ -14,7 +27,7 @@ class EKF():
         nu      (3DOF)
     ]
     '''
-    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15))):
+    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15,15))):
         '''
         Initialization:
 
@@ -46,10 +59,11 @@ class EKF():
         #self._Rd = np.eye(3)
 
         # Constant matrices
-        i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
-        M = M[i]
+        #i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
+        #M = M[i]
+        M = six2threeDOF(M)
         self._Minv = np.linalg.inv(M)                                       # 3DOF inverted mass matrix
-        self._D = D[i]                                                      # 3DOF damping matrix
+        self._D = six2threeDOF(D)                                           # 3DOF damping matrix
         
         self._H, self._B, self._E, self._Aw, self._gamma = 0,0,0,0,0
         self.initialize_constant_matrices()
@@ -69,8 +83,8 @@ class EKF():
         Update:
         Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
 
-        Inputs:
-            - tau: Control inputs (3DOF)
+        Parameters:
+            - tau: Control Parameters (3DOF)
             - y: Measured position (3DOF)
 
         To be implemented / Improvements:
@@ -89,7 +103,7 @@ class EKF():
         Predictor:
         Used to estimate the state of the system at the next time step based on the current state estimate and the system dynamics model.
         
-        Inputs:
+        Parameters:
             - tau = [X, Y, N]',  Control input (3DOF)
 
         To be implemented / Improvements:
@@ -107,7 +121,7 @@ class EKF():
         Corrector:
         Used to refine the predicted state estimate from the predictor, based on the obtained measurements. The function checks for signal loss (no measurement).
 
-        Input:
+        Parameters:
             - y = [eta1  eta2  eta6]', Measurements (3DOF) 
 
         To be implemented / Improvements:
@@ -136,7 +150,7 @@ class EKF():
         Kalman gain:
         Used to balance the contributions of the predicted state estimate and the measurement data in the updated estimate.
 
-        Input:
+        Parameters:
             - N/A
         Output:
             - K: Kalman gain (Dim = 15x3)
@@ -160,7 +174,7 @@ class EKF():
             -M_inv*D * nu + M_inv*R(psi).T * b
         ]
 
-        Input:
+        Parameters:
             - x: state vector (Dim = 15)
             - tau: Control vector [X  Y  N]
             - noise: Modelled white noise, set to zero in a deterministic EKF. (Dim=6)
@@ -204,7 +218,7 @@ class EKF():
             row (4):        0_(3x6)     del_f4      M_inv*R(psi).T  -M_inv*D                
         ]   
 
-        Input:
+        Parameters:
             - N/A
         Output:
             - phi: Discretized jacobian of system dynamics (Dim = 15x15)
@@ -268,7 +282,7 @@ class EKF():
             M_inv
         ]
 
-        Input:
+        Parameters:
             - N/A
 
         To be implemented / Improvements:
