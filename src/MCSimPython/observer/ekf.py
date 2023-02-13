@@ -55,12 +55,10 @@ class EKF():
             [0,10,0],
             [0,0,500*np.pi/180]
         ])
-        #self._Qd = np.eye(6)*.01
+        self._Qd = np.diag([4.57666453e-04, 6.54424838e-04, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 7.35349136e-01])
         #self._Rd = np.eye(3)
 
         # Constant matrices
-        #i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
-        #M = M[i]
         M = six2threeDOF(M)
         self._Minv = np.linalg.inv(M)                                       # 3DOF inverted mass matrix
         self._D = six2threeDOF(D)                                           # 3DOF damping matrix
