@@ -4,8 +4,9 @@ from MCSimPython.utils import Rz, pipi
 
 class NonlinObs3dof:
 
-    def __init__(self, dt, wc, wo, lambd, T, M, D):
+    def __init__(self, dt, wc, wo, lambd, T, M, D, lambda_w=0.03):
         self._dt = dt
+        lambda_w = lambda_w
         self.zeta = 1.0
         self.K1 = np.block([
             [-2*(self.zeta-lambd)*(wc/wo) * np.eye(3)],
@@ -16,7 +17,7 @@ class NonlinObs3dof:
         self.K3 = .1*self.K4
         self.Aw = np.block([
             [np.zeros((3,3)), np.eye(3)],
-            [-wo**2*np.eye(3), -2*lambd*wo*np.eye(3)],
+            [-wo**2*np.eye(3), -2*lambda_w*wo*np.eye(3)],
         ])
         self.Tinv = np.linalg.inv(T*np.eye(3))
         self._x_hat = np.zeros((15))
