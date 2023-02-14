@@ -4,8 +4,9 @@ from MCSimPython.utils import Rz, pipi
 
 class NonlinObs3dof:
 
-    def __init__(self, dt, wc, wo, lambd, T, M, D):
+    def __init__(self, dt, wc, wo, lambd, T, M, D, lambda_w=0.03):
         self._dt = dt
+        lambda_w = lambda_w
         self.zeta = 1.0
         self.K1 = np.block([
             [-2*(self.zeta-lambd)*(wc/wo) * np.eye(3)],
@@ -44,12 +45,11 @@ class NonlinObs3dof:
     def dynamics(self, tau, y):
         y_tilde = y - self._y_hat
         # Ensure that the smallest angle is used
-        y_tilde[2] = pipi(y_tilde[2])
+        y_tilde[2] = pipi(np.copy(y_tilde[2]))
         xi_hat_dot = self.Aw@self.xi + self.K1@y_tilde
         eta_hat_dot = Rz(y[2])@self.nu + self.K2@y_tilde
         b_hat_dot = -self.Tinv@self.bias + self.K3@y_tilde
-        nu_hat_dot = self.Minv@(-self.D@self.nu + tau +
-                                Rz(y[2]).T@self.bias + Rz(y[2]).T@self.K4@y_tilde)
+        nu_hat_dot = self.Minv@(-self.D@self.nu + tau + Rz(y[2]).T@self.bias + Rz(y[2]).T@self.K4@y_tilde)
         return np.concatenate((xi_hat_dot, eta_hat_dot, b_hat_dot, nu_hat_dot))
 
     def update(self, y, tau):
