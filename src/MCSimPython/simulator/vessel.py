@@ -125,7 +125,6 @@ class Vessel(ABC):
         tau : array_like
             Sum of all loads corresponding to vessel DOF.
         """
-        # self._x = self._x + self._dt * self._x_dot
         x = self.get_x()
         self._x = self.int_method(x, Uc, beta_c, tau)  # Compute new state vector through integration
         self._eta = self._x[:self._dof] # Set eta
