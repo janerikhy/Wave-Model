@@ -1,20 +1,24 @@
 # imports
 import numpy as np
-import matplotlib.pyplot as plt
 from MCSimPython.utils import Rz, six2threeDOF, three2sixDOF, pipi, Smat
-from MCSimPython.simulator.csad import CSAD_DP_6DOF
 
 
 
 class AdaptiveFSController():
     '''
     Adaptive controller using a Fourier series-based internal disturbance model in a MRAC
+
+    Parameters:
+            - dt: timestep
+            - M: Mass-matrix (6x6) of vessel (inertia + added mass)
+            - D: Full damping matrix (6x6) of vessel
+            - N: Number of wave frequency components. Set to 15 as default
+    
+
     '''
     def __init__(self, dt, M, D, N=15):
         '''
-        Parameters:
-            - 
-            - 
+        
 
         '''
         self._dt = dt
@@ -23,6 +27,7 @@ class AdaptiveFSController():
         
         self.theta_hat = np.zeros(2*N + 1)
         
+        # Frequencies to be used in disturbance model
         self._N = N
         w_min = 2*np.pi/20
         w_max = 2*np.pi/2
@@ -30,48 +35,79 @@ class AdaptiveFSController():
         self._freqs = np.arange(w_min, w_max, dw)
 
         # Tuning:
-        self._K1 = np.diag([10., 1., 1.])
-        self._K2 = np.diag([10., 1., 1.])
+        self._K1 = np.diag([10., 1., .1])
+        self._K2 = np.diag([10., 1., .1])
         self._gamma = np.eye(2*self._N +1) * 5
-        self._kappa = 1
+        self._kappa = 1                             # Must be positive
 
 
 
-    def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_dotdot, t):
+    def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_dotdot, t, calculate_bias=False):
+        '''
+        get_tau:
+        Calculate controller output...
 
+        Parameters:
+            - eta (3DOF): [surge, sway, yaw] expressed in NED
+            - eta_d (3DOF): Desired position expressed in NED
+            - nu (3DOF): [u, v, r] expressed in body
+            - eta_d_dot (3DOF): Desired velocity expressed in NED
+            - eta_d_ddot (3DOF): Desired acceleration expressed in NED
+            - t (float): Time
+            - Calculate_bias (bool): Function will also return estimated bias if True. Set to False as default.
+
+        Output:
+            - tau (3DOF): Calculated control forces
+            - b_hat (3DOF): Estimated bias in surge, sway, yaw. Only returned if "calculate_bias == True"
+        
+        '''
         R = Rz(eta[-1])
         S = Smat(np.array([0,0,nu[-1]]))
 
-        # eta_d_dot = R@nu_d
         regressor_transpose = self.get_regressor(t)
 
         Phi_transpose = np.array([regressor_transpose, regressor_transpose, regressor_transpose])
         Phi = Phi_transpose.T
         
+        # Introduce the first new state, which shall converge towards zero
         z1 = R.T@(eta-eta_d)
         z1[-1] = pipi(z1[-1])
 
-
+        # Virtual input function
         alpha0 = -self._kappa*np.eye(3)@z1
         alpha = -self._K1@z1 + R.T@eta_d_dot + alpha0
 
+        # The second introduced state, functioning as a virtual input to the first control system
         z2 = nu - alpha 
 
+        # Differentiate
         z1_dot = -S@z1 + z2 -(self._K1 + self._kappa*np.eye(3))@z1
-
         alpha_dot = -(self._K1 + self._kappa*np.eye(3))@z1_dot + S@R.T@eta_d_dot + R.T@eta_d_dotdot         # + eller - i andre ledd
 
-        theta_hat_dot = self._gamma@Phi@z2
+        # Adaptive update law
+        theta_hat_dot = self._gamma@Phi@z2                                                                  # @z1?
         self.theta_hat  += (theta_hat_dot * self._dt)
 
-
+        # Control law
         tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat
 
-        b_hat = Phi.T@self.theta_hat
-
+        # Calculate bias
+        if calculate_bias:
+            b_hat = Phi.T@self.theta_hat
+            return tau, b_hat
         return tau
 
     def get_regressor(self, t):
+        '''
+        get_regressor:
+        Extract a (2*N+1)-dimensional regressor defined as [1   cos(w1*t)   sin(w1*t)   cos(w2*t)   ...   sin(wN*t)]
+
+        Parameters:
+            - t: time (float)
+
+        Output:
+            - regressor: (2N + 1)-dim, time-dependent vector as defined above
+        '''
         regressor = np.zeros(2*self._N + 1)
         regressor[0] = 1
         for i in range(self._N):
