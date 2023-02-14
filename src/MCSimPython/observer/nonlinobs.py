@@ -17,7 +17,7 @@ class NonlinObs3dof:
         self.K3 = .1*self.K4
         self.Aw = np.block([
             [np.zeros((3,3)), np.eye(3)],
-            [-wo**2*np.eye(3), -2*lambda_w*wo*np.eye(3)],
+            [-wo**2*np.eye(3), -2*lambd*wo*np.eye(3)],
         ])
         self.Tinv = np.linalg.inv(T*np.eye(3))
         self._x_hat = np.zeros((15))
@@ -45,12 +45,11 @@ class NonlinObs3dof:
     def dynamics(self, tau, y):
         y_tilde = y - self._y_hat
         # Ensure that the smallest angle is used
-        y_tilde[2] = pipi(y_tilde[2])
+        y_tilde[2] = pipi(np.copy(y_tilde[2]))
         xi_hat_dot = self.Aw@self.xi + self.K1@y_tilde
         eta_hat_dot = Rz(y[2])@self.nu + self.K2@y_tilde
         b_hat_dot = -self.Tinv@self.bias + self.K3@y_tilde
-        nu_hat_dot = self.Minv@(-self.D@self.nu + tau +
-                                Rz(y[2]).T@self.bias + Rz(y[2]).T@self.K4@y_tilde)
+        nu_hat_dot = self.Minv@(-self.D@self.nu + tau + Rz(y[2]).T@self.bias + Rz(y[2]).T@self.K4@y_tilde)
         return np.concatenate((xi_hat_dot, eta_hat_dot, b_hat_dot, nu_hat_dot))
 
     def update(self, y, tau):

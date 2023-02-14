@@ -131,10 +131,13 @@ class RVG_DP_6DOF(Vessel):
         nu_c = Rz(eta[-1]).T@nu_cn
         nu_c = np.insert(nu_c, [3, 3, 3], 0)
         nu_r = nu - nu_c
+        # Calculate the time derivative of nu_c_b
+        dnu_cb = -Smat([0., 0., nu[-1]])@Rz(eta[-1]).T@nu_cn
+        dnu_cb = np.insert(dnu_cb, [2, 2, 2], 0)
+
         eta_dot = J(eta)@nu
 
-        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@eta) #- self._G@Jinv@eta)
-        #self._x_dot = np.concatenate([eta_dot, nu_dot])
+        nu_dot = self._Minv@(tau - self._D@nu_r - self._G@eta + self._Ma@dnu_cb)
         return np.concatenate([eta_dot, nu_dot])
     
     def set_hydrod_parameters(self, freq):
