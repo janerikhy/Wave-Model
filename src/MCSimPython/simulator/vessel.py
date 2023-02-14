@@ -1,4 +1,17 @@
 # vessel.py
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-10-31
+# Revised: 2023-01-23 Author    added RK4 integration
+# 
+# Tested:  2023-01-23 Jan-Erik Hygen Test that RK4 integration works properly
+# 
+# Copyright (C) 2022: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
 from abc import ABC, abstractclassmethod
 
@@ -79,33 +92,57 @@ class Vessel(ABC):
         self._nu = np.zeros(self._dof)
 
     @abstractclassmethod
-    def x_dot(self, *args, **kwargs):
+    def x_dot(self, Uc, beta_c, tau):
         """Kinematic and kinetic equation of vessel. The method must be overwritten
         by inherting vessel classes. The method should return the result of f(x, u, ..).
         It should not modify any of the object attributes.
-        The first argument of the x_dot function should be the state vector: x.
+        
+        Parameters
+        ----------
+        Uc : float
+            Current velocity
+        beta_c : float
+            Current direction in NED frame [rad]
+        tau : array_like
+            Sum of all loads corresponding to vessel DOF.
+
+        Returns
+        -------
+        array_like
+            Time derivative of the state vector.
         """
         raise NotImplementedError
 
-    def integrate(self, *args, **kwargs):
-        """Integrate the state vector one forward, using the specified integration method."""
+    def integrate(self, Uc, beta_c, tau):
+        """Integrate the state vector one forward, using the specified integration method.
+        
+        Parameters
+        ----------
+        Uc : float
+            Current velocity
+        beta_c : float
+            Current direction in NED frame [rad]
+        tau : array_like
+            Sum of all loads corresponding to vessel DOF.
+        """
         # self._x = self._x + self._dt * self._x_dot
         x = self.get_x()
-        self._x = self.int_method(x, *args, **kwargs)  # Compute new state vector through integration
+        self._x = self.int_method(x, Uc, beta_c, tau)  # Compute new state vector through integration
         self._eta = self._x[:self._dof] # Set eta
         self._eta[self._dof//6+2:] = pipi(self._eta[self._dof//6+2:])   # Keep radians in (-pi, pi)
         self._nu = self._x[self._dof:]  # Set nu
         self._x = np.concatenate([self._eta, self._nu])
 
-    def forward_euler(self, x, *args, **kwargs):
-        return x + self._dt * self.x_dot(x, *args, **kwargs)
+    def forward_euler(self, x, Uc, beta_c, tau):
+        """Forward Euler integration method."""
+        return x + self._dt * self.x_dot(x, Uc, beta_c, tau)
 
-    def RK4(self, x, *args, **kwargs):
+    def RK4(self, x, Uc, beta_c, tau):
         """Runge-Kutta 4 integration method."""
-        k1 = self.x_dot(x, *args, **kwargs)
-        k2 = self.x_dot(x + k1*self._dt/2, *args, **kwargs)
-        k3 = self.x_dot(x + k2*self._dt/2, *args, **kwargs)
-        k4 = self.x_dot(x + k3*self._dt, *args, **kwargs)
+        k1 = self.x_dot(x, Uc, beta_c, tau)
+        k2 = self.x_dot(x + k1*self._dt/2, Uc, beta_c, tau)
+        k3 = self.x_dot(x + k2*self._dt/2, Uc, beta_c, tau)
+        k4 = self.x_dot(x + k3*self._dt, Uc, beta_c, tau)
         
         return self._x + (k1 + 2*k2 + 2*k3 + k4)*self._dt/6
         
