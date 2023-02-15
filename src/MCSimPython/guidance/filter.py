@@ -1,3 +1,15 @@
+# filter.py
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2023-01-30
+# Revised: 
+# Tested:
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
 from MCSimPython.utils import Rz
 
