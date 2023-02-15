@@ -1,7 +1,7 @@
 # Utility functions
 
 # ----------------------------------------------------------------------------
-# This code is part of the _______ toolbox and repository.
+# This code is part of the MCSimPython toolbox and repository.
 # Created By: Jan-Erik Hygen
 # Created Date: 2022-10-12
 # Revised: 2023-02-09 Harald Mo    Add from/to 6 and 3DOF functions
