@@ -1,4 +1,15 @@
 # gunnerus.py
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-11-02
+# Revised: 2023-02-13 Jan-Erik Hygen    Add 6DOF DP model for RVG
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 from MCSimPython.simulator.vessel import Vessel
 from MCSimPython.utils import J, Rz, Smat, pipi
 
