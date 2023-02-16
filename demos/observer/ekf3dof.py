@@ -54,7 +54,7 @@ wave_dir = np.ones(N_w)*np.deg2rad(170)
 
 # Create vessel, observer and wave loads objects
 vessel = CSAD_DP_6DOF(dt)                                                           # Vessel
-KalmanFilter = EKF(dt, vessel._M, vessel._D)                                        # Observer
+KalmanFilter = EKF(dt, vessel._M, vessel._D, Tp=tp)                                        # Observer
 waveload = WaveLoad(wave_amps, w, eps, wave_dir, config_file=vessel._config_file)   # Wave loads
 
 # Set up a very simple reference model and reference points
@@ -93,7 +93,7 @@ for i in tqdm(range(N)):
     nu_d = Rz(psi).T@eta_d_dot                  # Convert desired velocity to body frame
     
     # Thruster forces
-    tau_cmd = controller.get_tau(KalmanFilter.eta_hat, eta_d, KalmanFilter.nu_hat, nu_d)    # 3 DOF
+    tau_cmd = controller.get_tau(KalmanFilter.get_eta_hat(), eta_d, KalmanFilter.get_nu_hat(), nu_d)    # 3 DOF
 
     # Wave forces
     tau_wf = waveload.first_order_loads(t, vessel.get_eta())
@@ -114,7 +114,7 @@ for i in tqdm(range(N)):
     # Save for plotting
     K = KalmanFilter.EKF_gain    
     storage_state[i] = np.concatenate([t, vessel.get_eta(),y, vessel.get_nu()], axis=None)
-    storage_observer[i] = np.concatenate([KalmanFilter.x_hat, np.diag(KalmanFilter.P_hat), K[:,0], K[:,1], K[:,2]], axis=None)
+    storage_observer[i] = np.concatenate([KalmanFilter.get_x_hat(), np.diag(KalmanFilter.get_P_hat()), K[:,0], K[:,1], K[:,2]], axis=None)
     storage_env[i] = np.concatenate([eta_d, nu_d], axis=None)
 
 # end =======================================================================================
