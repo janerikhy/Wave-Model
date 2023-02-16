@@ -6,20 +6,22 @@ from MCSimPython.utils import Rz, six2threeDOF, three2sixDOF, pipi, Smat
 
 class AdaptiveFSController():
     '''
-    Adaptive controller using a Fourier series-based internal disturbance model in a MRAC
+    Adaptive controller using a truncated Fourier series-based internal disturbance model in a "Model Reference Adaptive Control" (MRAC).
+    The control law is determined by using LgV-backstepping, based on calculations and procedures done in (Fossen, 2021) and (Brørby, 2022).
 
     Parameters:
-            - dt: timestep
-            - M: Mass-matrix (6x6) of vessel (inertia + added mass)
-            - D: Full damping matrix (6x6) of vessel
-            - N: Number of wave frequency components. Set to 15 as default
+        - dt: timestep
+        - M: Mass-matrix (6x6) of vessel (inertia + added mass)
+        - D: Full damping matrix (6x6) of vessel
+        - N: Number of wave frequency components. Set to 15 as default
     
-
+    To be implemented:
+        - Improved tuning.
+        - 
     '''
     def __init__(self, dt, M, D, N=15):
         '''
-        
-
+        Initialize
         '''
         self._dt = dt
         self._M = six2threeDOF(M)
@@ -27,27 +29,28 @@ class AdaptiveFSController():
         
         self.theta_hat = np.zeros(2*N + 1)
         
-        # Frequencies to be used in disturbance model
-        self._N = N
-        w_min = 2*np.pi/20
-        w_max = 2*np.pi/2
-        dw = (w_max-w_min)/self._N
-        self._freqs = np.arange(w_min, w_max, dw)
+        # Frequencies to be used in disturbance model - 
+        self._N = N                                 # Number of components
+        w_min = 2*np.pi/20                          # Lower bound
+        w_max = 2*np.pi/2                           # Upper bound
+        dw = (w_max-w_min)/self._N                  # Delta omega
+        self._freqs = np.arange(w_min, w_max, dw)   # Numpy array of frequencies
 
         # Tuning:
         self._K1 = np.diag([10., 1., .1])
-        self._K2 = np.diag([10., 1., .1])
+        self._K2 = np.diag([10., 1., .1])*100
         self._gamma = np.eye(2*self._N +1) * 5
         self._kappa = 1                             # Must be positive
 
 
 
-    def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_dotdot, t, calculate_bias=False):
+    def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_ddot, t, calculate_bias=False):
         '''
         get_tau:
         Calculate controller output...
 
-        Parameters:
+        Parameters
+        -----------
             - eta (3DOF): [surge, sway, yaw] expressed in NED
             - eta_d (3DOF): Desired position expressed in NED
             - nu (3DOF): [u, v, r] expressed in body
@@ -56,16 +59,17 @@ class AdaptiveFSController():
             - t (float): Time
             - Calculate_bias (bool): Function will also return estimated bias if True. Set to False as default.
 
-        Output:
+        Output
+        ------------
             - tau (3DOF): Calculated control forces
             - b_hat (3DOF): Estimated bias in surge, sway, yaw. Only returned if "calculate_bias == True"
         
         '''
-        R = Rz(eta[-1])
-        S = Smat(np.array([0,0,nu[-1]]))
+        R = Rz(eta[-1])                                 # Rotation matrix
+        S = Smat(np.array([0,0,nu[-1]]))                # Skew-symmetric matrix
 
+        # Use get_regressor() to calculate Phi
         regressor_transpose = self.get_regressor(t)
-
         Phi_transpose = np.array([regressor_transpose, regressor_transpose, regressor_transpose])
         Phi = Phi_transpose.T
         
@@ -82,7 +86,7 @@ class AdaptiveFSController():
 
         # Differentiate
         z1_dot = -S@z1 + z2 -(self._K1 + self._kappa*np.eye(3))@z1
-        alpha_dot = -(self._K1 + self._kappa*np.eye(3))@z1_dot + S@R.T@eta_d_dot + R.T@eta_d_dotdot         # + eller - i andre ledd
+        alpha_dot = -(self._K1 + self._kappa*np.eye(3))@z1_dot - S@R.T@eta_d_dot + R.T@eta_d_ddot        
 
         # Adaptive update law
         theta_hat_dot = self._gamma@Phi@z2                                                                  # @z1?
@@ -90,22 +94,27 @@ class AdaptiveFSController():
 
         # Control law
         tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat
+        # tau = R@tau                              # Ref frame of tau?
 
         # Calculate bias
         if calculate_bias:
             b_hat = Phi.T@self.theta_hat
             return tau, b_hat
+        
         return tau
 
     def get_regressor(self, t):
         '''
         get_regressor:
-        Extract a (2*N+1)-dimensional regressor defined as [1   cos(w1*t)   sin(w1*t)   cos(w2*t)   ...   sin(wN*t)]
+        Extract a (2*N+1)-dimensional regressor defined as [1   cos(w1*t)   sin(w1*t)   cos(w2*t)   ...   sin(wN*t)].
+        Used in get_tau() to calculate control forces.
 
-        Parameters:
+        Parameters
+        ----------
             - t: time (float)
 
-        Output:
+        Return
+        ----------
             - regressor: (2N + 1)-dim, time-dependent vector as defined above
         '''
         regressor = np.zeros(2*self._N + 1)
@@ -113,8 +122,23 @@ class AdaptiveFSController():
         for i in range(self._N):
             regressor[2*i + 1] = np.cos(self._freqs[i]*t)
             regressor[2*i + 2] = np.sin(self._freqs[i]*t)
-        
         return regressor
 
     
+    def set_freqs(self, w_min, w_max, N):
+        '''
+        set_freqs:
+        Customize the number and magnitude of wave frequencies to be included in the internal disturbance model.
+
+        UNIT IN RAD/S OR HZ?
+
+        Parameters
+        -----------
+            - w_min: Lower bound frequency
+            - w_max: Upper bound frequency
+            - N: Number of components
+        '''
+        self._N = N
+        dw = (w_max-w_min)/ self._N
+        self._freqs = np.arange(w_min, w_max, dw)
 
