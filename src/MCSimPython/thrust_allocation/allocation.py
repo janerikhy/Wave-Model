@@ -26,14 +26,6 @@ class AllocatorCSAD(ABC):
          allocation problem.
         """
         return len(self._thrusters)
-    
-    @property
-    def n_problem(self):
-        """
-        Number of unknown variables to be allocated
-         in the original (non-relaxed) problem.
-        """
-        return 2 * self.n_thrusters
 
     def add_thruster(self, thruster):
         """
@@ -44,10 +36,34 @@ class AllocatorCSAD(ABC):
         else:
             raise TypeError("Thruster is not of proper type!")
     
-    
-    def extended_allocation_problem(self):
+
+    @abstractmethod
+    def allocation_problem(self):
         """
         Assemble allocation problem into matrix form
+        """
+
+
+    @abstractmethod
+    def allocate(self, tau_d):
+        """
+        Allocate global thrust vector to available thrusters. 
+        """
+    
+
+class pseudo_inverse_allocator(AllocatorCSAD):
+
+    @property
+    def n_problem(self):
+        """
+        Number of unknown variables to be allocated
+         in the original (non-relaxed) problem.
+        """
+        return 2 * self.n_thrusters
+
+    def allocation_problem(self):
+        """
+        Assemble extended allocation problem into matrix form
         """
 
         T_e = np.zeros((DOFS, self.n_problem))
@@ -65,7 +81,6 @@ class AllocatorCSAD(ABC):
 
         return T_e, K_e
 
-
     def allocate(self, tau_d):
         """
         Allocate global thrust vector to available thrusters. 
@@ -77,7 +92,7 @@ class AllocatorCSAD(ABC):
              allocator-object before attempting an allocation!"""
             )
         
-        T_e, K_e = self.extended_allocation_problem()
+        T_e, K_e = self.allocation_problem()
 
         T_e_pseudo = np.transpose(T_e) @ (np.linalg.inv(T_e @ np.transpose(T_e)))
 
@@ -91,11 +106,58 @@ class AllocatorCSAD(ABC):
             alpha[i] = np.arctan2(u_e[i*2+1], u_e[i*2])
         
         return u, alpha
-    
-"""
-class PseudoInverse(AllocatorCSAD):
+
+
+class fixed_angle_allocator(AllocatorCSAD):
+
+    theta = np.deg2rad(30)
+
+    alpha = [np.pi,
+             np.pi/2 + theta,
+             3 * np.pi/2 - theta,
+             - np.pi,
+             - np.pi/2 + theta,
+             np.pi/2 - theta]
+
+    def allocation_problem(self):
+        """
+        Assemble extended allocation problem into matrix form
+        """
+
+        K_lst = [thruster._K for thruster in self._thrusters]
+
+        lx = [thruster.pos_x for thruster in self._thrusters]
+        ly = [thruster.pos_y for thruster in self._thrusters]
+
+        K = np.diag(K_lst)
+        
+        T = np.array([[-1.0, -np.sin(self.theta), -np.sin(self.theta), 1, np.sin(self.theta), np.sin(self.theta)],
+                        [0.0, -np.cos(self.theta), np.cos(self.theta), 0.0, -np.cos(self.theta), np.cos(self.theta)],
+                        [0.0, -np.cos(self.theta) * lx[1] + np.sin(self.theta) * ly[1], np.cos(self.theta) * lx[2] - np.sin(self.theta) * ly[2], 
+                        0.0, -np.cos(self.theta) * lx[4] + np.sin(self.theta) * ly [4], np.cos(self.theta) * lx[5] - np.sin(self.theta) * ly[5]]])
+
+        return T, K
 
     def allocate(self, tau_d):
-    
-        return u
-"""
+        """
+        Allocate global thrust vector to available thrusters. 
+        """
+
+        if self.n_thrusters == 0:
+            raise AllocationError(
+                """At least one thruster must be added
+            to the
+             allocator-object before attempting an allocation!"""
+            )
+        
+        T, K = self.allocation_problem()
+
+        B = T @ K
+
+        B_inv = np.transpose(B) @ (np.linalg.inv(B @ np.transpose(B)))
+
+        u = B_inv @ tau_d
+
+        alpha = self.alpha
+        
+        return u, alpha
