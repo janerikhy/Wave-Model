@@ -11,7 +11,7 @@ The folder contains the following files:
 ## Information about CSAD
 
 ### Thruster configuration
-
+![CSAD Thruster Configuration](CSAD_thrusters.png)
 
 ## Conventions
 
