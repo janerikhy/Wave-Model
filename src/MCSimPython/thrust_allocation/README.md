@@ -23,7 +23,6 @@ CSAD is equipped with six azimuth thrusters which is positioned as illustrated b
 
 ![CSAD Thruster Configuration](CSAD_thrusters.png)
 
-
 ## Conventions for mapping to MC-lab
 
 The azimuth angles &alpha; are defined as follow:
