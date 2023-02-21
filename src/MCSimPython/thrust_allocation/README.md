@@ -2,6 +2,13 @@
 
 This folder contains code implementation realted to thrust allocation of CSAD.
 
+Inspiration is taken from both of the following repositories. It is recommended for any user to check these out.
+
+- https://github.com/freol35241/quta
+  - Check out for inspiration for implementing a quadratically optimized thrust allocation with constraints.
+- https://github.com/NTNU-MCS/CS_ArcticDrillship/tree/master/2022_MTech/Br%C3%B8rby/csad_dp-main/src/thrust_allocation
+  - Check out for CSAD spesific ROS adaptable thrust allocation implementation. 
+
 The folder contains the following files:
 
 - `allocation.py`: Solves the allocation problem
