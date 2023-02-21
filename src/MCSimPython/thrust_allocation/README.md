@@ -11,7 +11,19 @@ The folder contains the following files:
 ## Information about CSAD
 
 ### Thruster configuration
+
+CSAD is equipped with six azimuth thrusters which is positioned as illustrated below.
+
 ![CSAD Thruster Configuration](CSAD_thrusters.png)
 
-## Conventions
 
+## Conventions for mapping to MC-lab
+
+The azimuth angles &alpha; are defined as follow:
+- &alpha; = 0&deg; &rarr; max positive surge thrust
+- &alpha; = 90&deg; &rarr; max positive sway thrust
+
+Note that the angles are given in radians.
+
+All variables setting and reading the power of the motors are mapped from -1.0 to 1.0, with 1 being 100% forward and -1.0 being 100% backwards. As
+the motors are much more powerful than desired for the model the thrust is halved. This means the 1 is actually just 50% of the capability of the motors. Note that there is nothing in the code stopping anyone from sending 2 and setting the motor to 100% power.
