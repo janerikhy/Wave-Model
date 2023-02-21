@@ -112,12 +112,12 @@ class fixed_angle_allocator(AllocatorCSAD):
 
     theta = np.deg2rad(30)
 
-    alpha = [np.pi,
+    alpha = np.array([np.pi,
              np.pi/2 + theta,
              3 * np.pi/2 - theta,
              - np.pi,
              - np.pi/2 + theta,
-             np.pi/2 - theta]
+             np.pi/2 - theta])
 
     def allocation_problem(self):
         """
@@ -131,10 +131,10 @@ class fixed_angle_allocator(AllocatorCSAD):
 
         K = np.diag(K_lst)
         
-        T = np.array([[-1.0, -np.sin(self.theta), -np.sin(self.theta), 1, np.sin(self.theta), np.sin(self.theta)],
-                        [0.0, -np.cos(self.theta), np.cos(self.theta), 0.0, -np.cos(self.theta), np.cos(self.theta)],
-                        [0.0, -np.cos(self.theta) * lx[1] + np.sin(self.theta) * ly[1], np.cos(self.theta) * lx[2] - np.sin(self.theta) * ly[2], 
-                        0.0, -np.cos(self.theta) * lx[4] + np.sin(self.theta) * ly [4], np.cos(self.theta) * lx[5] - np.sin(self.theta) * ly[5]]])
+        T = np.array([
+            np.cos(self.alpha),
+            np.sin(self.alpha),
+            lx * np.sin(self.alpha) - ly * np.cos(self.alpha)])
 
         return T, K
 
