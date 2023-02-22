@@ -1,4 +1,19 @@
 # Module for computing wave loads on vessel
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-10-26
+# Revised: 2023-01-30 Jan-Erik Hygen    Add multidir wave loads.
+#          2023-02-01 Jan-Erik Hygen    Add finite depth dispersion relation.
+#          2023-02-05 Jan-Erik Hygen    Add relative incident wave angle
+#                                       computation function.
+#          2023-02-07 Jan-Erik Hygen    Add interpolation of force RAO.
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
 import json
 from MCSimPython.utils import to_positive_angle, pipi
@@ -84,6 +99,7 @@ class WaveLoad:
         self._set_force_raos()
 
     def __call__(self, time, eta):
+        """Calculate first- and second-order wave loads."""
         tau_wf = self.first_order_loads(time, eta)
         tau_sv = self.second_order_loads(time, eta[-2])
         return tau_wf + tau_sv
