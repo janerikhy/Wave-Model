@@ -30,7 +30,7 @@ for i in range(len(tau_d)):
     ThrustDyn = dynamics.ThrusterDynamics(u, alpha, dt=0.2)
     tau = ThrustDyn.get_tau(u, alpha)
 
-# Get tau when u set constraints for u
+# Get tau when we have set constraints for u
 
 for i in range(len(tau_d)):
     u, alpha = allocator.allocate(tau_d[i])

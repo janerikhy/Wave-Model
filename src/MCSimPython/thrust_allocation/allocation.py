@@ -13,7 +13,7 @@ class AllocationError(Exception):
 class AllocatorCSAD(ABC):
     """
     Abstract base class for allocation problem
-    formulations.
+    formulations. Spesific for CSAD.
     """
 
     def __init__(self):
@@ -23,7 +23,7 @@ class AllocatorCSAD(ABC):
     def n_thrusters(self):
         """
         Number of thrusters assigned to this
-         allocation problem.
+        allocation problem.
         """
         return len(self._thrusters)
 
@@ -57,13 +57,14 @@ class pseudo_inverse_allocator(AllocatorCSAD):
     def n_problem(self):
         """
         Number of unknown variables to be allocated
-         in the original (non-relaxed) problem.
+        in the original problem.
         """
         return 2 * self.n_thrusters
 
     def allocation_problem(self):
+
         """
-        Assemble extended allocation problem into matrix form
+        Assemble extended allocation problem into matrix form.
         """
 
         T_e = np.zeros((DOFS, self.n_problem))
@@ -78,18 +79,20 @@ class pseudo_inverse_allocator(AllocatorCSAD):
 
         K_e = np.diag(K_vec)
 
-
         return T_e, K_e
+    
 
     def allocate(self, tau_d):
+
         """
         Allocate global thrust vector to available thrusters. 
         """
+
         if self.n_thrusters == 0:
             raise AllocationError(
                 """At least one thruster must be added
-            to the
-             allocator-object before attempting an allocation!"""
+                    to the
+                    allocator-object before attempting an allocation!"""
             )
         
         T_e, K_e = self.allocation_problem()
@@ -98,8 +101,8 @@ class pseudo_inverse_allocator(AllocatorCSAD):
 
         u_e = np.linalg.inv(K_e) @ T_e_pseudo @ tau_d
 
-        u = np.zeros(6)
-        alpha = np.zeros(6)
+        u = np.zeros(self.n_thrusters)
+        alpha = np.zeros(self.n_thrusters)
 
         for i in range(self.n_thrusters):
             u[i] = np.sqrt(u_e[i*2]**2 + u_e[i*2+1]**2)
@@ -146,8 +149,8 @@ class fixed_angle_allocator(AllocatorCSAD):
         if self.n_thrusters == 0:
             raise AllocationError(
                 """At least one thruster must be added
-            to the
-             allocator-object before attempting an allocation!"""
+                    to the
+                    allocator-object before attempting an allocation!"""
             )
         
         T, K = self.allocation_problem()
