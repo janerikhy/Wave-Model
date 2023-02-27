@@ -330,7 +330,7 @@ def timeit(func):
 
 
 def rigid_body_transform(r, eta):
-    """Calculate the motion of a point r different from the COG.
+    """Calculate the relative motion of a point r different from the COG.
 
     The calculation assumes small angles (s.t. cos(theta)=0 and sin(theta)=theta)
     and is computed as:
