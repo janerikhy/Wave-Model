@@ -329,7 +329,7 @@ def timeit(func):
     return wrapper
 
 
-def rigid_body_transform(r, eta):
+def rigid_body_transform(r, eta, in_ned=True):
     """Calculate the relative motion of a point r different from the COG.
 
     The calculation assumes small angles (s.t. cos(theta)=0 and sin(theta)=theta)
@@ -343,6 +343,10 @@ def rigid_body_transform(r, eta):
         Lever arm from COG to point of interest
     eta : array_like
         6DOF vessel pose (surge, sway, heave, roll, pitch, yaw)
+    in_ned : bool (default = False)
+        Reference frame definition of eta. If True, the vessel
+        pose eta is assumed to be defined in the NED-frame. If False
+        eta is assumed to be defined in body-frame.
 
     Returns
     -------
@@ -350,4 +354,6 @@ def rigid_body_transform(r, eta):
         Translation vector which is the same as (delta_x, delta_y, delta_z).
     """
 
+    if in_ned:
+        eta = np.copy(np.linalg.inv(J(eta))@eta)
     return eta[:3] + np.cross(eta[3:], r)
