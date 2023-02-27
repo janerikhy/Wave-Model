@@ -327,3 +327,34 @@ def timeit(func):
         print(f"Execution time of {func.__name__}: {(t2 - t1):.4f}")
         return results
     return wrapper
+
+
+def rigid_body_transform(r, eta, in_ned=True):
+    """Calculate the relative motion of a point r different from the COG.
+
+    The calculation assumes small angles (s.t. cos(theta)=0 and sin(theta)=theta)
+    and is computed as:
+
+    ``s = (\eta_1, \eta_2, \eta_3)^T + (\eta_4, \eta_5, \eta_6) x (r_x, r_y, r_z)``
+    
+    Parameters
+    ----------
+    r : array_like
+        Lever arm from COG to point of interest
+    eta : array_like
+        6DOF vessel pose (surge, sway, heave, roll, pitch, yaw)
+    in_ned : bool (default = False)
+        Reference frame definition of eta. If True, the vessel
+        pose eta is assumed to be defined in the NED-frame. If False
+        eta is assumed to be defined in body-frame.
+
+    Returns
+    -------
+    s : array_like
+        Translation vector which is the same as (delta_x, delta_y, delta_z).
+    """
+
+    if in_ned:
+        eta = np.copy(np.linalg.inv(J(eta))@eta)
+        print(eta)
+    return eta[:3] + np.cross(eta[3:], r)
