@@ -356,4 +356,5 @@ def rigid_body_transform(r, eta, in_ned=True):
 
     if in_ned:
         eta = np.copy(np.linalg.inv(J(eta))@eta)
+        print(eta)
     return eta[:3] + np.cross(eta[3:], r)
