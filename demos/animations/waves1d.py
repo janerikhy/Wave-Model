@@ -8,7 +8,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from MCSimPython.waves import JONSWAP, WaveLoad
 from MCSimPython.simulator import RVG_DP_6DOF
 from MCSimPython.control.basic import PID
-from MCSimPython.utils import pipi
+from MCSimPython.utils import pipi, J, Rz, Ry, Rx, Rzyx
 
 # plt.style.use('science')
 
@@ -50,6 +50,8 @@ points = np.array([
     [Lpp/2, T]
 ])
 
+points[:, 1] = -points[:, 1]
+
 hs = 2.9
 tp = 9.0
 wp = 2*np.pi/tp
@@ -59,7 +61,7 @@ g = 9.81
 wmin = wp/2
 wmax = 3.*wp
 
-N = 200
+N = 4
 w = np.linspace(wmin, wmax, N)
 k = w**2/g
 
@@ -85,7 +87,8 @@ wl = WaveLoad(
     freqs=w,
     eps=eps,
     angles=beta,
-    config_file=vessel._config_file
+    config_file=vessel._config_file,
+    interpolate=True
 )
 
 motionRAOamp = np.asarray(wl._params['motionRAO']['amp'])[:, :, :, 0]
@@ -128,9 +131,10 @@ l4, = plt.plot([], [], 'r-', lw=1.4)
 l5, = plt.plot([], [], 'o--', lw=1.5)
 
 plt.xlim(xmin, xmax)
-plt.ylim(-2*T, 3.5*T)
+plt.ylim(-3.5*T, 2.*T)
 plt.xlabel("$x \; [m]$")
 plt.ylabel("$\zeta (t, x) \; [m]$")
+plt.gca().invert_yaxis()
 
 def wave(t):
     return np.sum(wave_amp*np.cos(w*t - k*np.cos(beta)*x[:, None]-eps), axis=1)
@@ -155,7 +159,7 @@ time = np.arange(0, tmax, 1/fps)
 sim_eta = [points]
 x_cg_eta = [np.array([-1.38, 0.])]
 
-
+hp = np.ix_([0,2],[0,2])
 for i, t in enumerate(time):
     pos = np.array([0.0, 0.0, 0.0, 0.0, 0.0, vessel.get_eta()[-1]])
     tau_wf = wl.first_order_loads(t, pos)
@@ -166,7 +170,9 @@ for i, t in enumerate(time):
     vessel.integrate(0.0, 0.0, tau_wf)
     eta = vessel.get_eta()
 
-    sim_eta.append(points + [transform(points[i, 0], points[i, 1], eta[0], eta[2], -eta[4]) for i in range(len(points))])
+    # Try to transform from NED frame to classical xyz-plane (with z positive up)
+    # sim_eta.append(points + [transform(points[i, 0], points[i, 1], eta[0], eta[2], -eta[4]) for i in range(len(points))])
+    sim_eta.append(np.array([eta[0], eta[2]]) + [Ry(eta[4])[hp]@point for point in points])
     x_cg_eta.append(transform(x_cg_eta[0][0], x_cg_eta[0][1], eta[0], eta[2], -eta[4]))
 
 

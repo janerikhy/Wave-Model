@@ -18,4 +18,4 @@ Examples
 """
 
 from MCSimPython.control.backstepping import BacksteppingController
-from MCSimPython.control.basic import PD
+from MCSimPython.control.basic import PD, PID
