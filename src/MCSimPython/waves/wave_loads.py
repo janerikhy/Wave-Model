@@ -15,6 +15,7 @@
 # ---------------------------------------------------------------------------
 
 import numpy as np
+from scipy.interpolate import interp1d
 import json
 from MCSimPython.utils import to_positive_angle, pipi
 
@@ -73,7 +74,8 @@ class WaveLoad:
                 g=9.81,
                 dof=6,
                 depth = 100,
-                deep_water=True):
+                deep_water=True,
+                interpolate=True):
         with open(config_file, 'r') as f:
             vessel_params = json.load(f)
         self._N = wave_amps.shape[0]
@@ -96,7 +98,7 @@ class WaveLoad:
             np.asarray(vessel_params['freqs']),
             np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0]
         )
-        self._set_force_raos()
+        self._set_force_raos(interpolate)
 
     def __call__(self, time, eta):
         """Calculate first- and second-order wave loads."""
@@ -104,7 +106,7 @@ class WaveLoad:
         tau_sv = self.second_order_loads(time, eta[-2])
         return tau_wf + tau_sv
 
-    def _set_force_raos(self):
+    def _set_force_raos(self, interpolate=None):
         """
         Function to set the force RAOs to be used in calculation
         of 1st order wave loads.
@@ -114,13 +116,19 @@ class WaveLoad:
         phase = np.array(self._params['forceRAO']['phase'])[:, :, :, 0]
         freqs = np.array(self._params['freqs'])
 
-        freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
+        if interpolate:
+            f1 = interp1d(freqs, np.abs(amp), axis=1, bounds_error=False, fill_value=(amp[:,0,:], 0))
+            f2 = interp1d(freqs, phase, axis=1, bounds_error=False, fill_value=(0, phase[:,-1,:]))
+            self._forceRAOamp = f1(self._freqs)
+            self._forceRAOphase = f2(self._freqs)
+        else:
+            freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
 
-        self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
-        self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
-        for dof in range(6):
-            self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
-            self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
+            self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
+            self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
+            for dof in range(6):
+                self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
+                self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
     def first_order_loads(self, t, eta):
         """
