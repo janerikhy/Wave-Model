@@ -38,3 +38,13 @@ All code implementation is found in the `src` directory. The python package is s
 
 Demonstration of how the individual components of the python package can be used is given in `demos`. Some demos of combination of the different components are also given here. 
 
+## Visualization
+
+
+![6DOF RVG 2D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/wave_motion1d.gif)
+
+
+![6DOF RVG 3D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d__rvg2.gif)
+
+![6DOF CSAD 2D Visualisation](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d_22.gif)
+
