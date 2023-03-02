@@ -4,6 +4,7 @@ Vessel simulator used in master project and master thesis of M. Kongshaug, H. Mo
 
 The python package is not complete and there is no guarantee for the validity of the vessel models.
 
+## Structure
 All code implementation is found in the `src` directory. The python package is structured as follows:
 
 - `src/MCSimPython/simulator/` Simulation Models. *Python Path*:= `MCSimPython.simulator`
