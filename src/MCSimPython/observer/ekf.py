@@ -36,10 +36,12 @@ class EKF():
         '''
         Initialization:
 
-        Parameters:
+        Parameters
+        -----------
             - dt (float): Time step
             - M (numpy array (6, 6)): Inertia matrix of system (including added mass) 6DOF
             - D (numpy array (6, 6)): Full damping matrix of system 6DOF
+            - Tp (int): Peak period of wave spectre
         '''
         self._dt = dt
 
@@ -272,6 +274,7 @@ class EKF():
         E = [
             0_(3x3)     0_(3x3)
             E_w         0_(3x3)
+            0_(3x3)     0_(3x3)
             0_(3x3)     E_b
             0_(3x3)     0_(3x3)
         ]
