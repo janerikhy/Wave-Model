@@ -89,6 +89,10 @@ using a simple for loop.
         # Compute the first and second order wave loads
         tau_wave = waveload(time[i], vessel.get_eta())
 
+        # Alternatively, compute first and second-order loads separately
+        # tau_wf = waveload.first_order_loads(time[i], vessel.get_eta())
+        # tau_sv = waveload.second_order_loads(time[i], vessel.get_eta()[-1])
+
         vessel.integrate(Uc, betac, tau_wave)
 
         eta[i] = vessel.get_eta()
