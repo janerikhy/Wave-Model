@@ -8,8 +8,15 @@ Basic Controllers
 
 The module contains simple PD and PID controllers. 
 
+PD Controller
+^^^^^^^^^^^^^
+
 .. autoclass:: MCSimPython.control.basic.PD
     :members:
+
+
+PID Controller
+^^^^^^^^^^^^^^
 
 .. autoclass:: MCSimPython.control.basic.PID
     :members:
@@ -19,7 +26,7 @@ Backstepping Controllers
 ------------------------
 
 In the ``MCSimPython.control.backstepping`` module there are controllers based on backstepping
-theory. 
+theory. Currently, only a backstepping controller for maneuvering purposes has been implemented.
 
 .. autoclass:: MCSimPython.control.backstepping.BacksteppingController
     :members:

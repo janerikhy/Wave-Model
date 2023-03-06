@@ -1,6 +1,6 @@
 """
 Vessel Simulation Models (:mod:`MCSimPython.simulator`)
-================================================
+=======================================================
 
 The MCSimPython simulator package contains a set of 
 different simulation models.
