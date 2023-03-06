@@ -97,10 +97,11 @@ class EKF():
             - Asynchronous measurements?
             - Set y to nan if no measurement
         '''
-        # Predict        
-        self.predictor(tau)
         # Correct
         self.corrector(y)
+        # Predict        
+        self.predictor(tau)
+        
 
     
     def predictor(self, tau):
