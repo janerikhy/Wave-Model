@@ -4,6 +4,8 @@ Vessel simulator used in master project and master thesis of M. Kongshaug, H. Mo
 
 The python package is not complete and there is no guarantee for the validity of the vessel models.
 
+The complete documentation can be found at: https://wave-model.readthedocs.io/en/latest/index.html
+
 ## Structure
 All code implementation is found in the `src` directory. The python package is structured as follows:
 
