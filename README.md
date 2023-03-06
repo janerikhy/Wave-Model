@@ -6,6 +6,27 @@ The python package is not complete and there is no guarantee for the validity of
 
 The complete documentation can be found at: https://wave-model.readthedocs.io/en/latest/index.html
 
+## How to use MCSimPython
+
+### PyPi
+The `MCSimPython` package can be installed from PyPi using `pip`:
+
+`pip install MCSimPython`
+
+### From GitHub:
+Install from GitHub in the following way when developing the package.
+- Clone the GitHub repository to your local computer.
+- Create a virtual environment `py -m venv name-of-venv`
+- Activate virtual environment `name-of-venv\scripts\activate`
+- Update pip and setuptools: `py -m pip install --upgrade pip setuptools`
+- Install the python package locally as an editable: `pip install -e .`
+- Verify that the python package `MCSimPython` has been installed properly by running a demo script, or simply
+```
+(venv) C:\path\to\dir> python
+>>> import MCSimPython
+>>>
+```
+
 ## Structure
 All code implementation is found in the `src` directory. The python package is structured as follows:
 
@@ -21,20 +42,6 @@ All code implementation is found in the `src` directory. The python package is s
 - `src/MCSimPython/control` Controllers : `MCSimPython.control` *(in development)*
     - `basic.py`: Simple PD and PID controllers
     - `backstepping.py`: A simple backstepping controller (no bias compensation).
-
-## How to use MCSimPython
-
-- Clone the GitHub repository to your local computer.
-- Create a virtual environment `py -m venv name-of-venv`
-- Activate virtual environment `name-of-venv\scripts\activate`
-- Update pip and setuptools: `py -m pip install --upgrade pip setuptools`
-- Install the python package locally as an editable: `pip install -e .`
-- Verify that the python package `MCSimPython` has been installed properly by running a demo script, or simply
-```
-(venv) C:\path\to\dir> python
->>> import MCSimPython
->>>
-```
 
 
 ## Demos
