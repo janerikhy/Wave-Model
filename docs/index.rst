@@ -8,7 +8,7 @@ Welcome to MC Sim Python's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Contents
 
    getting_started
    modules/simulator
