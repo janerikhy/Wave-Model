@@ -10,6 +10,7 @@ Welcome to MC Sim Python's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   getting_started
    modules/simulator
    modules/waves
 
