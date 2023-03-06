@@ -12,6 +12,10 @@ Welcome to MC Sim Python's documentation!
 
    getting_started
    modules/simulator
+   modules/control
+   modules/guidance
+   modules/thrust_allocation
+   modules/observer
    modules/waves
 
 Indices and tables
