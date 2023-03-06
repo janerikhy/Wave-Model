@@ -13,6 +13,8 @@ Install
 ``MCSimPython`` can be installed via pip from `PyPi`_.
 
 .. code-block:: shell
+
     pip install MCSimPython
+
 
 .. _PyPI: https://pypi.org/
