@@ -18,6 +18,13 @@ Welcome to MC Sim Python's documentation!
    modules/observer
    modules/waves
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/simulation
+   tutorials/waveload
+
 Indices and tables
 ==================
 
