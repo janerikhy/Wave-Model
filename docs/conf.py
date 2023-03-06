@@ -12,8 +12,8 @@ sys.path.insert(0, os.path.abspath("../"))
 sys.path.insert(0, os.path.abspath("../src/"))
 
 project = 'MC Sim Python'
-copyright = '2023, Jan-Erik Hygen'
-author = 'Jan-Erik Hygen'
+copyright = '2023, J. Hygen, M. Konsghaug, H. Mo'
+author = 'Jan-Erik Hygen, Marie Konshaug, Harald Mo'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
