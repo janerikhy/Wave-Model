@@ -6,8 +6,17 @@
 Welcome to MC Sim Python's documentation!
 =========================================
 
+|License: GPL v3|
+
+.. |License: GPL v3| image:: https://img.shields.io/badge/License-GPLv3-blue.svg
+   :target: https://www.gnu.org/licenses/gpl-3.0 
+
+The ``MCSimPython`` package is developed as a part of the master thesis of M. Kongshaug, H. Mo, and J. Hygen, at the
+`Department of Marine Technology (NTNU, Trondheim) <https://www.ntnu.edu/imt>`_. The package is used for simulation of DP stationkeeping models and
+manuevering models. 
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents
 
    getting_started
