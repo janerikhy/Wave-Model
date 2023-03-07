@@ -1,5 +1,7 @@
 # MCSimPython
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)    
+
 Vessel simulator used in master project and master thesis of M. Kongshaug, H. Mo and J. Hygen. The project is developed at Norwegian University of Science and Technology, Institue of Marine Technology. 
 
 The python package is not complete and there is no guarantee for the validity of the vessel models.
