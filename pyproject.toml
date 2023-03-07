@@ -23,6 +23,14 @@ dependencies = [
     "matplotlib"
 ]
 
+keywords = [
+  'mcsim',
+  'MCSimPython',
+  'DP',
+  'dynamic positioning',
+  'Marine Cybernetics'
+]
+
 [tool.setuptools]
 include-package-data = true
 
