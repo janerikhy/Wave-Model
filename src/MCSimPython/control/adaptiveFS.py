@@ -8,12 +8,6 @@ class AdaptiveFSController():
     '''
     Adaptive controller using a truncated Fourier series-based internal disturbance model in a "Model Reference Adaptive Control" (MRAC).
     The control law is determined by using LgV-backstepping, based on calculations and procedures done in (Fossen, 2021) and (Brørby, 2022).
-
-    Parameters:
-        - dt: timestep
-        - M: Mass-matrix (6x6) of vessel (inertia + added mass)
-        - D: Full damping matrix (6x6) of vessel
-        - N: Number of wave frequency components. Set to 15 as default
     
     To be implemented:
         - Improved tuning.
@@ -22,6 +16,13 @@ class AdaptiveFSController():
     def __init__(self, dt, M, D, N=15):
         '''
         Initialize
+
+        Parameters
+        ------------
+            - dt: timestep
+            - M: Mass-matrix (6x6) of vessel (inertia + added mass)
+            - D: Full damping matrix (6x6) of vessel
+            - N: Number of wave frequency components. Set to 15 as default
         '''
         self._dt = dt
         self._M = six2threeDOF(M)
@@ -29,12 +30,10 @@ class AdaptiveFSController():
         
         self.theta_hat = np.zeros(2*N + 1)
         
-        # Frequencies to be used in disturbance model - 
-        self._N = N                                 # Number of components
+        # Frequencies to be used in disturbance model 
         w_min = 2*np.pi/20                          # Lower bound
         w_max = 2*np.pi/2                           # Upper bound
-        dw = (w_max-w_min)/self._N                  # Delta omega
-        self._freqs = np.arange(w_min, w_max, dw)   # Numpy array of frequencies
+        self.set_freqs(w_min, w_max, N)
 
         # Tuning:
         self._K1 = np.diag([10., 1., .1])
@@ -46,7 +45,6 @@ class AdaptiveFSController():
 
     def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_ddot, t, calculate_bias=False):
         '''
-        get_tau:
         Calculate controller output...
 
         Parameters
