@@ -69,7 +69,7 @@ class LTVKF():
         # Initial tuning
         # self.Qd = np.eye(6)
         # self.Rd = np.eye(3)
-        self.Q, self.Rd = np.array([
+        self.Qd, self.Rd = np.array([
                 [1e-3,0,0,0,0,0],
                 [0,1e-3,0,0,0,0],
                 [0,0,.2*np.pi/180,0,0,0],
@@ -239,3 +239,6 @@ class LTVKF():
     
     def get_nu_hat(self):
         return self.xhat[12:15] 
+    
+    def get_bias(self):
+        return self.xhat[9:12]
