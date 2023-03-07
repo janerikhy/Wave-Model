@@ -12,7 +12,7 @@ Welcome to MC Sim Python's documentation!
    :target: https://www.gnu.org/licenses/gpl-3.0 
 
 The ``MCSimPython`` package is developed as a part of the master thesis of M. Kongshaug, H. Mo, and J. Hygen, at the
-Institute of Marine Technology (NTNU, Trondheim). The package is used for simulation of DP stationkeeping models and
+`Department of Marine Technology (NTNU, Trondheim) <https://www.ntnu.edu/imt>`_. The package is used for simulation of DP stationkeeping models and
 manuevering models. 
 
 .. toctree::
