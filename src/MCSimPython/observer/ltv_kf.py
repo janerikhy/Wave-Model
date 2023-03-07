@@ -128,16 +128,22 @@ class LTVKF():
             - tau: Control Parameters (3DOF)
             - y: Measured position (3DOF)
             - psi_m: Vessel heading, used to find R(t)
-        
-        Returns
-        -----------
-            - N/A
+            - asynchronous: True if measurement interval and simulation time step are asynchrounous. Set to false as default.
         '''
+
+        if asynchronous:
+            self.update_async(tau, y, psi_m)
+            return None
+        
         # Correct
         self.corrector(y)
         # Predict        
         self.predictor(tau, psi_m)
-       
+    
+
+    def update_async(self, tau, y, psi_m):
+        return NotImplementedError
+    
         
     
     def predictor(self, tau, psi_m):
