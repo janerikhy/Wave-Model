@@ -16,7 +16,7 @@ Institute of Marine Technology (NTNU, Trondheim). The package is used for simula
 manuevering models. 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents
 
    getting_started
