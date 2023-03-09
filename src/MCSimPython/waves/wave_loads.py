@@ -1,7 +1,23 @@
 # Module for computing wave loads on vessel
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-10-26
+# Revised: 2023-01-30 Jan-Erik Hygen    Add multidir wave loads.
+#          2023-02-01 Jan-Erik Hygen    Add finite depth dispersion relation.
+#          2023-02-05 Jan-Erik Hygen    Add relative incident wave angle
+#                                       computation function.
+#          2023-02-07 Jan-Erik Hygen    Add interpolation of force RAO.
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
+from scipy.interpolate import interp1d
 import json
-from MCSimPython.utils import to_positive_angle
+from MCSimPython.utils import to_positive_angle, pipi
 
 class WaveLoad:
     """Class for computation of wave loads on floating structure. Both 
@@ -39,14 +55,9 @@ class WaveLoad:
         Vessel force RAO amplitude for the given wave frequencies _freq.
     _forceRAOphase : array_like
         Vessel force RAO phase for the given wave frequencies _freq.
-
-    Methods
-    -------
-    _set_force_raos()
-    _first_order_loads()
-    _second_order_loads()
-    _full_qtf_6dof()
     """
+
+    QTF_METHODS = ["Newman", "geo-mean"]
 
     def __init__(self, 
                 wave_amps,
@@ -58,7 +69,47 @@ class WaveLoad:
                 g=9.81,
                 dof=6,
                 depth = 100,
-                deep_water=True):
+                deep_water=True,
+                qtf_method="Newman",
+                qtf_interp_angles=True,
+                interpolate=True):
+        """
+        Initialize a WaveLoad object for a sea state.
+
+        Parameters
+        ----------
+        wave_amps : array_like
+            1D array of wave amplitudes
+        freqs : array_like
+            1D array of frequencies [rad/s]
+        eps : array_like
+            1D array of random phase [rad/s]
+        angles : array_like
+            1D array of wave angles (defined as going to).
+        config_file : path_like
+            File path to vessel configuration file. This can
+            be obtained directly from a Vessel object using
+            Vessel._config_file.
+        rho : float (default = 1025)
+            Water density
+        g : float (default 9.81)
+            Gravitational acceleration
+        depth : float (default = 1000)
+            Water depth. Only used when deep water is False. Used
+            to compute the dispersion relation.
+        deep_water : bool (default = True)
+            Boolean to specify if infinite deep water assumption.
+        qtf_method : string (default = "Newman")
+            QTF approximation method. Can be either "Newman" or
+            "geo-mean" as specified in the WaveLoad.QTF_METHODS.
+        qtf_interp_angles : bool (default = True)
+            Boolean to specify whether or not to use interpolation
+            over the wave angles when computing the QTF matrices.
+        interpolate : bool (default = True)
+            Boolean value to specify whether or not to use 
+            1D interpolation over the frequencies when computing
+            the first-order force RAO matrices and QTF matrices.
+        """
         with open(config_file, 'r') as f:
             vessel_params = json.load(f)
         self._N = wave_amps.shape[0]
@@ -68,6 +119,7 @@ class WaveLoad:
         self._angles = angles
         self._depth = depth
         self._qtf_angles = np.asarray(vessel_params['headings'])
+        self._qtf_freqs = np.asarray(vessel_params['freqs'])
         self._params = vessel_params
         self._g = g
         self._k = freqs**2/g
@@ -79,35 +131,49 @@ class WaveLoad:
         self._Q = self._full_qtf_6dof(
             np.asarray(vessel_params['headings']),
             np.asarray(vessel_params['freqs']),
-            np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0]
+            np.asarray(vessel_params['driftfrc']['amp'])[:, :, :, 0],
+            method=qtf_method,
+            interpolate=interpolate,
+            qtf_interp_angles=qtf_interp_angles
         )
-        self._set_force_raos()
+        self._set_force_raos(interpolate)
 
+    def __call__(self, time, eta):
+        """Calculate first- and second-order wave loads."""
+        tau_wf = self.first_order_loads(time, eta)
+        tau_sv = self.second_order_loads(time, eta[-2])
+        return tau_wf + tau_sv
 
-    def _set_force_raos(self):
+    def _set_force_raos(self, interpolate=None):
         """
         Function to set the force RAOs to be used in calculation
         of 1st order wave loads.
-        Selected for the wave frequencies of the sea-state by closest index.
+        Selected for the wave frequencies of the sea-state by closest index or
+        interpolated over frequencies.
         """
         amp = np.array(self._params['forceRAO']['amp'])[:, :, :, 0]
         phase = np.array(self._params['forceRAO']['phase'])[:, :, :, 0]
         freqs = np.array(self._params['freqs'])
 
-        freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
+        if interpolate:
+            f1 = interp1d(freqs, np.abs(amp), axis=1, bounds_error=False, fill_value=(amp[:,0,:], 0))
+            f2 = interp1d(freqs, phase, axis=1, bounds_error=False, fill_value=(0, phase[:,-1,:]))
+            self._forceRAOamp = f1(self._freqs)
+            self._forceRAOphase = f2(self._freqs)
+        else:
+            freq_indx = np.array([np.argmin(np.abs(freqs - w)) for w in self._freqs])
 
-        self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
-        self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
-        for dof in range(6):
-            self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
-            self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
+            self._forceRAOamp = np.zeros((6, self._N, len(self._qtf_angles)))
+            self._forceRAOphase = np.zeros((6, self._N, len(self._qtf_angles)))
+            for dof in range(6):
+                self._forceRAOamp[dof] = amp[dof, [freq_indx], :][0]
+                self._forceRAOphase[dof] = phase[dof, [freq_indx], :][0]
 
     def first_order_loads(self, t, eta):
         """
         Calculate first order wave-loads by super position of 
         wave load from each individual wave component.
 
-        (Assumption: The force RAO amplitude and phase is known).
 
         Parameters
         ----------
@@ -125,13 +191,8 @@ class WaveLoad:
             First order wave-frequency load for each DOF.
         """
         rel_angle = self._relative_incident_angle(eta[-1])
-        heading_index = np.argmin(np.abs(self._qtf_angles - np.abs(rel_angle[:, None])), axis=1)
 
-        freq_ind = np.arange(0, self._N)
-
-        # Select RAO for given relative wave angle.
-        rao_amp = self._forceRAOamp[:, freq_ind, heading_index]
-        rao_phase = self._forceRAOphase[:, freq_ind, heading_index]
+        rao_amp, rao_phase = self._rao_interp(rel_angle)
     
         # Horizontal position of vessel (N, E).
         x = eta[0]
@@ -151,18 +212,18 @@ class WaveLoad:
         """
         Calcualation of second order drift loads.
 
-        Estimate 2nd order drift loads using either Newman or formulation from 
-        Standing, Brendling and Wilson (as used by OrcaFlex).
+        Estimate 2nd order drift loads using either Newman [1]_ or formulation from 
+        Standing, Brendling and Wilson [2]_ (as used by OrcaFlex).
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         t : float
             Time.
         heading: float
             Vessel heading in NED-frame.
 
-        Return:
-        -------
+        Return
+        ------
         tau_sv : 6x1 - array
             Array of slowly-vayring load components for each DOF.
 
@@ -170,6 +231,8 @@ class WaveLoad:
         ----------
         .. [1] J. N. Newman. Marine hydrodynamics / J. N. Newman. MIT Press Cambridge, Mass, 1977. ISBN
            0262140268.
+        .. [2] R. Standing, W. Brendling, and D. Wilson. Recent Developments in the Analysis of Wave Drift
+            Forces, Low-Frequency Damping and Response. All Days, 04 1987. doi: 10.4043/5456-MS. OTC-5456-MS.
         """
 
         # Use the mean relative angle to compute the slowly-varying loads
@@ -178,17 +241,26 @@ class WaveLoad:
         # Get the QTF matrix for the given heading for each DOF.
         heading_index = np.argmin(np.abs(self._qtf_angles - rel_angle))
         Q = self._Q[:, heading_index, :, :]
+        # print(Q.shape)
 
         tau_sv = np.real(self._amp@(Q*np.exp(self._W*(1j*t) + 1j*self._P))@self._amp)
         
         return tau_sv
 
-    def _full_qtf_6dof(self, qtf_headings, qtf_freqs, qtfs, method="Newman"):
-        """Generate the full QTF matrix for all DOF, all headings with calculated QTF
+    def _full_qtf_6dof(self, qtf_headings, qtf_freqs, qtfs, method=None, interpolate=None, qtf_interp_angles=None):
+        """
+        Generate the full QTF matrix for all DOF, all headings with calculated QTF
         and for all wave frequency components.
 
-        VERES ONLY CALCULATES DRIFT FORCES FROM SURGE SWAY AND YAW. THEREFOR THE REMAINING
-        DOFs WILL NOT REQUIRE QTF AND WILL BE SET TO ZERO.
+        ShipX only calculates the mean drift force for surge, sway, and yaw. Hence,
+        the QTFs are only calculated for these DOFs.
+
+        The off-diagonal terms of the QTFs are calculated using Newmanns approximation [3]_.
+        The user can specify whether to interpolate over frequencies and angles, or to use
+        the closest value. It is recommended to at least use interpolation over the frequencies.
+        The default QTF approximation use the arithmetic mean. An alternative method for 
+        computing the off-diagonal terms is the geometric mean [4]_. The geometric mean
+        results in lower QTF values for the far-from off-diagonal terms. 
 
         Parameters
         ----------
@@ -201,22 +273,72 @@ class WaveLoad:
         method : string (default="Newman")
             Method to be used for approximating off-diagonal terms. Newman approximation
             is the default method, geometric mean (as used in OrcaFlex) is the other.
+        interpolate : bool (default=True)
+            1D Interpolation if the mean drift components w.r.t frequency.
+        qtf_interp_angles : bool (default=True)
+            Interpolate the QTFs w.r.t relative incident wave angle.
         
         Returns
         -------
         Q : 6 x M x N x N array
             Approximated full QTF for 6 DOF, M headings and N wave frequencies.
+
+        See also
+        --------
+        WaveLoad.get_methods()
+        WaveLoad.QTF_METHODS
+
+        References
+        ----------
+        .. [3] J. N. Newman. Marine hydrodynamics / J. N. Newman. MIT Press Cambridge, Mass, 1977. ISBN
+            0262140268.
+        .. [4] R. Standing, W. Brendling, and D. Wilson. Recent Developments in the Analysis of Wave Drift
+            Forces, Low-Frequency Damping and Response. All Days, 04 1987. doi: 10.4043/5456-MS. OTC-5456-MS.
+        
         """
         
         freq_indices = [np.argmin(np.abs(qtf_freqs - freq)) for freq in self._freqs]
-        Q = np.zeros((6, len(qtf_headings), self._N, self._N))
-
-        for dof in range(6):
-            Qdiag = qtfs[dof, [freq_indices], :].copy()
-            for i in range(len(qtf_headings)):
-                if method == "Newman":
-                    Q[dof, i] = 0.5*(Qdiag[0, :, i, None] + Qdiag[0, :, i])
-        
+        print("Generate QTF matrices".center(100, '*'))
+        print(f"Using {'Newman' if method=='Newman' else 'Geometric mean'}\n")
+        if interpolate:
+            # Add a point to linearly interpolate to zero for high frequencies.
+            if self._freqs[0] < qtf_freqs[0]:
+                qtf_freqs = np.insert(qtf_freqs, [0], 0)
+                qtfs = np.insert(qtfs, [0], 0, axis=1)
+            f_qdiag_w = interp1d(qtf_freqs, qtfs, axis=1, bounds_error=False, fill_value=(qtfs[:, 0], qtfs[:, -1]))
+            Qdiag = f_qdiag_w(self._freqs)
+            if qtf_interp_angles:
+                angles_1deg = np.linspace(0, 2*np.pi, 360)
+                f_qdiag_beta = interp1d(qtf_headings, Qdiag, axis=2, bounds_error=False, fill_value=(Qdiag[:, :, 0], Qdiag[:, :, -1]))
+                Qdiag = f_qdiag_beta(angles_1deg)
+            Q = np.zeros((6, Qdiag.shape[2], self._N, self._N))
+            for dof in range(6):
+                for i in range(Qdiag.shape[2]):
+                    if method == "Newman":
+                        Q[dof, i] = .5*(Qdiag[dof, :, i, None] + Qdiag[dof, :, i])
+                    elif method == "geo-mean":
+                        cond = (np.sign(Qdiag[dof, :, i, None]) == np.sign(Qdiag[dof, :, i]))
+                        # cond = np.ix_(~cond[0], ~cond[1])
+                        Q[dof, i] = cond*np.sign(Qdiag[dof, :, i])*np.abs(Qdiag[dof, :, i, None]*Qdiag[dof, :, i])**.5
+                        # Q[dof, i][cond] = 0
+                    else:
+                        raise ValueError(f"{method} is not a valid method. Valid methods = {WaveLoad.get_methods()}")
+        else:
+            Q = np.zeros((6, qtf_headings.shape[0], self._N, self._N))
+            for dof in range(6):
+                Qdiag = qtfs[dof, [freq_indices], :].copy()
+                for i in range(len(qtf_headings)):
+                    if method == "Newman":
+                        Q[dof, i] = 0.5*(Qdiag[0, :, i, None] + Qdiag[0, :, i])
+                    elif method == "geo-mean":
+                        cond = (np.sign(Qdiag[0, :, i, None]) == np.sign(Qdiag[0, :, i]))
+                        # cond = np.ix_(~cond[0], ~cond[1])
+                        Q[dof, i] = cond*np.sign(Qdiag[0, :, i, None])*np.abs(Qdiag[0, :, i, None]*Qdiag[0, :, i])**.5
+                        # Q[dof, i][cond] = 0
+                    else:
+                        raise ValueError(f"{method} is not a valid method. Valid methods = {WaveLoad.get_methods()}")
+                        
+        print("QTF matrices complete.".center(100, '*'))
         # From config file, qtf[2] is yaw - not heave. Changing this here.
         Q[5] = Q[2].copy()
         Q[2] = np.zeros_like(Q[0])
@@ -271,4 +393,27 @@ class WaveLoad:
         gamma : array_like
             Array of relative incident wave angles.
         """
-        return to_positive_angle(self._angles - heading)
+        return to_positive_angle(pipi(self._angles - heading))
+
+    def _rao_interp(self, rel_angle):
+        index_lb = np.argmin(np.abs(np.rad2deg(self._qtf_angles) - np.floor(np.rad2deg(rel_angle[:, None])/10)*10), axis=1)
+        index_ub = np.where(index_lb < 35, index_lb + 1, 0)
+
+        freq_ind = np.arange(0, self._N)
+        
+        rao_amp_lb = self._forceRAOamp[:, freq_ind, index_lb]
+        rao_phase_lb = self._forceRAOphase[:, freq_ind, index_lb]
+
+        rao_amp_ub = self._forceRAOamp[:, freq_ind, index_ub]
+        rao_phase_ub = self._forceRAOphase[:, freq_ind, index_ub]
+
+        theta1, theta2 = self._qtf_angles[index_lb], self._qtf_angles[index_ub]
+        scale = pipi(rel_angle - theta1)/pipi(theta2 - theta1)
+        # Ensure that diff theta1 and theta2 is the smallest signed angle
+        rao_amp = rao_amp_lb + (rao_amp_ub - rao_amp_lb)*scale
+        rao_phase = rao_phase_lb + (rao_phase_ub - rao_phase_lb)*scale
+        return rao_amp, rao_phase
+
+    @classmethod
+    def get_methods(cls):
+        return cls.QTF_METHODS

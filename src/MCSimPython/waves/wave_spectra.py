@@ -1,4 +1,16 @@
 # Wave spectra
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-10-11
+# Revised: 2022-10-19 Jan-Erik Hygen    Add 2d spectrum functionality.
+#          2022-10-27 Jan-Erik Hygen    Add spreading function.
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
 from abc import ABC, abstractclassmethod
 
@@ -30,6 +42,7 @@ class BaseSpectrum(ABC):
         return freq, spectrum
 
     def moment(self, n, *args, **kwargs):
+        """Calculate n-th spectral moment."""
         freq, spec = self.__call__(*args, **kwargs)
         return np.trapz(freq**n * spec, freq)
 

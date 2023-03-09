@@ -1,4 +1,15 @@
 # csad.py
+
+# ----------------------------------------------------------------------------
+# This code is part of the MCSimPython toolbox and repository.
+# Created By: Jan-Erik Hygen
+# Created Date: 2022-11-04
+# Revised: 
+# 
+# Copyright (C) 2023: NTNU, Trondheim
+# Licensed under GPL-3.0-or-later
+# ---------------------------------------------------------------------------
+
 import numpy as np
 import os
 import json
@@ -21,7 +32,8 @@ DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, 'v
 
 class CSADMan3DOF(Vessel):
 
-    """CSAD 3DOF Maneuvering model.
+    """
+    CSAD 3DOF Maneuvering model.
 
     Attributes
     ----------
@@ -147,21 +159,24 @@ class CSAD_DP_6DOF(Vessel):
     def set_hydrod_parameters(self, freq):
         """Set the hydrodynamic added mass and damping for a given frequency.
         
-        Parameters:
-        -----------
+        Parameters
+        ----------
         freq : array_like
             Frequency in rad/s. Can either be a single frequency, or 
             multiple frequencies with dimension n = DOF. 
 
         Examples
         --------
-        # Set a hydrodynamic parameters for one frequency
+
+        Set a hydrodynamic parameters for one frequency
+
         >>> dt = 0.01
         >>> model = CSAD_DP_6DOF(dt)
         >>> frequency = 2*np.pi
         >>> model.set_hydrod_parameters(frequency)
 
         Set frequency for individual components
+
         >>> freqs = [0., 0., 2*np.pi, 2*np.pi, 2*np.pi, 0.]
         >>> model.set_hydrod_parameters(freqs)
         """

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "MCSimPython"
-version = "0.0.12"
+version = "0.0.14"
 authors = [
   { name="Jan-Erik Hygen", email="janereh@stud.ntnu.no" },
 ]
@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 
 dependencies = [
@@ -21,6 +21,14 @@ dependencies = [
     "pandas",
     "scipy",
     "matplotlib"
+]
+
+keywords = [
+  'mcsim',
+  'MCSimPython',
+  'DP',
+  'dynamic positioning',
+  'Marine Cybernetics'
 ]
 
 [tool.setuptools]

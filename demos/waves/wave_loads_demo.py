@@ -77,7 +77,7 @@ tau_wf_2 = np.zeros_like(tau_wf_1)
 
 for i in range(len(time)):
     tau_wf_1[i] = wave_load.first_order_loads(time[i], vessel.get_eta())
-    tau_wf_2[i] = wave_load.second_order_loads(time[i], heading)
+    tau_wf_2[i] = wave_load.second_order_loads(time[i], vessel.get_eta()[-1])
 
 
 
