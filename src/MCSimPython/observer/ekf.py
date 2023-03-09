@@ -2,10 +2,12 @@
 # ekf.py
 # ----------------------------------------------------------------------------
 # This code is part of the MCSimPython toolbox and repository.
-# Created By: Mo, Kongshaug, Hygen
+# Created By: Harald Mo
 # Created Date: 2023-02-13
+
 # Revised: N/A
-# Tested:  2023-02-13 Full test of observer performance. Tuning can be improved.
+
+# Tested:  See demos\observer\ekd3dof.py
 # 
 # Copyright (C) 2023: NTNU, Trondheim
 # Licensed under GPL-3.0-or-later
@@ -26,15 +28,20 @@ class EKF():
         bias    (3DOF)
         nu      (3DOF)
     ]
+
+    Reference:
+        - Fossen (2021), Marine craft hydrodynamics and motion control, ch 13.
     '''
-    def __init__(self, dt, M, D, x0=np.zeros(15), P0 = np.zeros((15,15))):
+    def __init__(self, dt, M, D, Tp, x0=np.zeros(15), P0 = np.zeros((15,15))):
         '''
         Initialization:
 
-        Params:
-            - dt: Time step
-            - M: Inertia matrix of system (including added mass) 6DOF
-            - D: Full damping matrix of system 6DOF
+        Parameters
+        -----------
+            - dt (float): Time step
+            - M (numpy array (6, 6)): Inertia matrix of system (including added mass) 6DOF
+            - D (numpy array (6, 6)): Full damping matrix of system 6DOF
+            - Tp (int): Peak period of wave spectre
         '''
         self._dt = dt
 
@@ -44,29 +51,25 @@ class EKF():
             [0,1e-3,0,0,0,0],
             [0,0,.2*np.pi/180,0,0,0],
             [0,0,0,1e2,0,0],
-            [0,0,0,0,5e2,0],
+            [0,0,0,0,1e2,0],
             [0,0,0,0,0,1e1]
         ])
-        # Minke 3 første gir: mindre støy på vel + dårligere pos
-        # Øke 3 siste gir bedre pos estimater, + mer støy på vel
-        # Sånn ish...
+    
         self._Rd = np.array([
             [100,0,0],
-            [0,10,0],
+            [0,100,0],
             [0,0,500*np.pi/180]
         ])
-        #self._Qd = np.eye(6)*.01
+        #self._Qd = np.diag([4.57666453e-04, 6.54424838e-04, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 7.35349136e-01])
         #self._Rd = np.eye(3)
 
         # Constant matrices
-        #i = np.ix_([0,1,5],[0,1,5])                                         # Extract surge-sway-yaw DOFs
-        #M = M[i]
         M = six2threeDOF(M)
         self._Minv = np.linalg.inv(M)                                       # 3DOF inverted mass matrix
         self._D = six2threeDOF(D)                                           # 3DOF damping matrix
         
         self._H, self._B, self._E, self._Aw, self._gamma = 0,0,0,0,0
-        self.initialize_constant_matrices()
+        self.initialize_constant_matrices(Tp)
         
         
         # Initial values
@@ -83,19 +86,22 @@ class EKF():
         Update:
         Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
 
-        Parameters:
+        Parameters
+        ----------
             - tau: Control Parameters (3DOF)
             - y: Measured position (3DOF)
 
-        To be implemented / Improvements:
+        To be implemented / Improvements
+        -----------
             - Error checks?
             - Asynchronous measurements?
             - Set y to nan if no measurement
         '''
-        # Predict        
-        self.predictor(tau)
         # Correct
         self.corrector(y)
+        # Predict        
+        self.predictor(tau)
+        
 
     
     def predictor(self, tau):
@@ -103,11 +109,10 @@ class EKF():
         Predictor:
         Used to estimate the state of the system at the next time step based on the current state estimate and the system dynamics model.
         
-        Parameters:
+        Parameters
+        ----------
             - tau = [X, Y, N]',  Control input (3DOF)
-
-        To be implemented / Improvements:
-            - 
+             
         '''
         phi = self.state_function_jacobian()
         f = self.state_function(self._xhat, tau, np.zeros(6))
@@ -121,15 +126,17 @@ class EKF():
         Corrector:
         Used to refine the predicted state estimate from the predictor, based on the obtained measurements. The function checks for signal loss (no measurement).
 
-        Parameters:
+        Parameters
+        -----------
             - y = [eta1  eta2  eta6]', Measurements (3DOF) 
 
-        To be implemented / Improvements:
+        To be implemented / Improvements
+        ----------
             - Check if measurement is given. Can also be made with modulus operator if measurement freq is different from dt.
             - 
         '''
 
-        if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor
+        if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
             self._Phat = self._Pbar
             self._xhat = self._xbar
         else:
@@ -150,20 +157,20 @@ class EKF():
         Kalman gain:
         Used to balance the contributions of the predicted state estimate and the measurement data in the updated estimate.
 
-        Parameters:
+        Parameters
+        -----------
             - N/A
-        Output:
-            - K: Kalman gain (Dim = 15x3)
 
-        To be implemented / Improvements:
-            - 
+        Output
+        -----------
+            - K: Kalman gain (Dim = 15x3)
         '''
         parenthesis = self._H@self._Pbar@(self._H.T) + self._Rd
         K = self._Pbar@(self._H.T)@np.linalg.inv(parenthesis)
         return K
 
 
-    def state_function(self, x, tau, noise):                    # f(x,u,w)
+    def state_function(self, x, tau, noise = np.zeros(6)):                    # f(x,u,w)
         '''
         x_dot = A(x) + B*tau + E*w      = f(x,u,w)
 
@@ -174,15 +181,15 @@ class EKF():
             -M_inv*D * nu + M_inv*R(psi).T * b
         ]
 
-        Parameters:
+        Parameters
+        ----------
             - x: state vector (Dim = 15)
             - tau: Control vector [X  Y  N]
             - noise: Modelled white noise, set to zero in a deterministic EKF. (Dim=6)
-        Output:
-            - f: x_dot (Dim = 15)
 
-        To be implemented / Improvements:
-            - 
+        Output
+        ----------
+            - f: x_dot (Dim = 15)
         '''
         xi = x[0:6]
         eta = x[6:9]
@@ -218,13 +225,14 @@ class EKF():
             row (4):        0_(3x6)     del_f4      M_inv*R(psi).T  -M_inv*D                
         ]   
 
-        Parameters:
+        Parameters
+        ----------
             - N/A
-        Output:
+
+        Output
+        -----------
             - phi: Discretized jacobian of system dynamics (Dim = 15x15)
 
-        To be implemented / Improvements:
-            - 
         '''
         # Extract states
         psi = self._xhat[8]
@@ -255,7 +263,7 @@ class EKF():
 
 
 
-    def initialize_constant_matrices(self):
+    def initialize_constant_matrices(self, Tp):
         '''
         Initialize following matrices:
 
@@ -267,6 +275,7 @@ class EKF():
         E = [
             0_(3x3)     0_(3x3)
             E_w         0_(3x3)
+            0_(3x3)     0_(3x3)
             0_(3x3)     E_b
             0_(3x3)     0_(3x3)
         ]
@@ -282,32 +291,32 @@ class EKF():
             M_inv
         ]
 
-        Parameters:
-            - N/A
+        Parameters
+        ----------
+            - Tp: Sea state peak period
 
-        To be implemented / Improvements:
+        To be implemented / Improvements
+        ----------
             - Tuning must be done
             - Can add wave spectrum properties as input in tuning? Tp, Damping, Kw_i
             - Use np.block() in _Aw
         '''
 
         # A_w
-        Tp = 1e7                                                # Wave period
         omega = 2*np.pi/Tp                                      # Should approx be peak freq in wave spectrum
         zeta = .05                                              # Damping coeff
-        # Define A_w = [
-        # Aw1   Aw2
-        # Aw3   Aw4
-        # ]
-        Aw1 = np.zeros((3,3))
-        Aw2 = np.eye(3)
-        Aw3 = -omega**2*np.eye(3)
-        Aw4 = -2*zeta*omega*np.eye(3)
-        self._Aw = np.concatenate((np.concatenate((Aw1, Aw2), axis=1),np.concatenate((Aw3, Aw4), axis=1)), axis=0)  # Should probably be made more readable. Use np.block
-        
+        '''Define A_w = [
+                Aw11   Aw12
+                Aw21   Aw22  ]'''
+        Aw11 = np.zeros((3,3))
+        Aw12 = np.eye(3)
+        Aw21 = -omega**2*np.eye(3)
+        Aw22 = -2*zeta*omega*np.eye(3)
+        self._Aw = np.block([[Aw11, Aw12], [Aw21, Aw22]])
+
         # E
         self._E = np.zeros((15,6))
-        Ew = np.diag([1,1,1])*.01                               # Multiplied with .01 because no waves
+        Ew = np.diag([1,1,1])                               # Multiplied with .01 because no waves
         Eb = np.eye(3)
         self._E[3:6,0:3] = Ew 
         self._E[9:12,3:6] = Eb
@@ -326,21 +335,37 @@ class EKF():
     
 
     def set_tuning_matrices(self, Q, R):
+        '''
+        set_tuning_matrices
+        Customize tuning matrices in the EKF
+
+        Parameters
+        ----------
+        Q : array_like
+            (6,6)-dim array stating covariance in model uncertainty
+        R : array_like
+            (6,6)-dim array stating covariance in measurement uncertainty
+
+        Return
+        ------
+        N/A
+        
+        '''
         self._Qd = Q
         self._Rd = R
     
 
-    @property
-    def x_hat(self):
+    
+    def get_x_hat(self):
         return self._xhat
-    @property
-    def P_hat(self):
+    
+    def get_P_hat(self):
         return self._Phat
-    @property
-    def eta_hat(self):
+    
+    def get_eta_hat(self):
         return self._xhat[6:9]
-    @property
-    def nu_hat(self):
+    
+    def get_nu_hat(self):
         return self._xhat[12:15] 
         
 

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from MCSimPython.simulator.csad import CSAD_DP_6DOF
-from MCSimPython.observer.ekf import EKF
+from MCSimPython.observer.ltv_kf import LTVKF
 from MCSimPython.control.basic import PD, PID
 from MCSimPython.waves.wave_loads import WaveLoad
 from MCSimPython.waves.wave_spectra import JONSWAP
@@ -21,7 +21,7 @@ plt.rcParams.update({
 
 # Sim parameters
 dt = 0.01
-N = 10000
+N = 50000
 t = np.arange(0, dt*N, dt)
 np.random.seed(1234)
 
@@ -54,7 +54,7 @@ wave_dir = np.ones(N_w)*np.deg2rad(170)
 
 # Create vessel, observer and wave loads objects
 vessel = CSAD_DP_6DOF(dt)                                                           # Vessel
-KalmanFilter = EKF(dt, vessel._M, vessel._D, Tp=tp)                                        # Observer
+KalmanFilter = LTVKF(dt, vessel._M, vessel._D, Tp=tp)                               # Observer
 waveload = WaveLoad(wave_amps, w, eps, wave_dir, config_file=vessel._config_file)   # Wave loads
 
 # Set up a very simple reference model and reference points
@@ -105,14 +105,15 @@ for i in tqdm(range(N)):
     vessel.integrate(U, np.deg2rad(beta_u), tau)
 
     # Measurement
-    noise = np.concatenate((np.random.normal(0,.167,size=3),np.random.normal(0,.017,size=3)))
+    noise = np.concatenate((np.random.normal(0,.1,size=3),np.random.normal(0,.017,size=3)))
     y = np.array(vessel.get_eta() + noise)                                                  # 6 DOF
 
     # Observer
-    KalmanFilter.update(tau_cmd, six2threeDOF(y))
+    psi_measured = vessel.get_eta()[-1]
+    KalmanFilter.update(tau_cmd, six2threeDOF(y), psi_measured)
     
     # Save for plotting
-    K = KalmanFilter.EKF_gain    
+    K = KalmanFilter.KF_gain    
     storage_state[i] = np.concatenate([t, vessel.get_eta(),y, vessel.get_nu()], axis=None)
     storage_observer[i] = np.concatenate([KalmanFilter.get_x_hat(), np.diag(KalmanFilter.get_P_hat()), K[:,0], K[:,1], K[:,2]], axis=None)
     storage_env[i] = np.concatenate([eta_d, nu_d], axis=None)
