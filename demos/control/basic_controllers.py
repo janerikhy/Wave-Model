@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+#from /home/hydrolab/dev/Wave-Model/src/MCSimPython/simulator/
+
+# spør jan om hvordan vi får tak i mc sim
+
 from MCSimPython.simulator.csad import CSADMan3DOF
 from MCSimPython.guidance.filter import ThrdOrderRefFilter
 from MCSimPython.control.basic import PD, PID
