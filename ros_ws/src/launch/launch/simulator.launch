@@ -1,0 +1,8 @@
+<launch>
+    <node name="CSAD_simulator" pkg = "simulator" type="csad"/>
+    <node name="CSAD_ekf" pkg = "observer" type="ekf" />
+    <node name="controller" pkg = "controller" type="fourier_series" />
+    <node name="thrust_allocator" pkg = "thrust_allocator" type="fixed" />
+    <node name="guidance" pkg = "guidance" type="path_param" />
+    <!--node name="<node type>" pkg ="<package name>" type="<executable name>" respawn="<if true will start node again if closed>"/-->
+</launch>

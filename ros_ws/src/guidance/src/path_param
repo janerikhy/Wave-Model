@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+import rospy
+
+from std_msgs.msg import Float64MultiArray
+
+
+def obsCallback(msg):
+    pass
+
+
+if __name__ == '__main__':
+    vessel_name = "CSAD"
+    rospy.init_node(f"{vessel_name}_guidance")
+    rospy.loginfo(f"INITIALIZING {vessel_name} GUIDANCE NODE")
+    r = rospy.Rate(100)
+    dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
+
+    # Subscribers
+    # observer_sub = rospy.Subscriber(f"/{vessel_name}/observer_states", OBSSTATES, tauCmdCallback)
+
+    # Publishers
+    # reference_pub = rospy.Publisher(f"/{vessel_name}/reference", REFMSG, queue_size=1)
+
+    # Messages
+
+    while not rospy.is_shutdown():
+
+        r.sleep()
+
+    rospy.spin()
+    rospy.shutdown()
