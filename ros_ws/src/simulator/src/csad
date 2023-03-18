@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import rospy
-import numpy as np
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
@@ -15,8 +14,8 @@ def alphaCallback(msg):
 
 
 if __name__ == '__main__':
-    vessel_name = "csad"
-    rospy.init_node(f"{vessel_name}")
+    vessel_name = "CSAD"
+    rospy.init_node(f"{vessel_name}_simulator")
     rospy.loginfo(f"INITIALIZING {vessel_name} SIMULATION NODE")
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
@@ -35,8 +34,8 @@ if __name__ == '__main__':
         f"/{vessel_name}/tau", Float64MultiArray, queue_size=1)
 
     # Messages
-    # odom_msg = Odometry()
-    # tau_msg = Float64MultiArray()
+    odom_msg = Odometry()
+    tau_msg = Float64MultiArray()
 
     while not rospy.is_shutdown():
 
