@@ -3,6 +3,7 @@ import rospy
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
+from messages.msg import Observer_state, Reference
 
 
 def refCallback(msg):
@@ -22,8 +23,10 @@ if __name__ == '__main__':
 
     # Subscribers
 
-    # reference_sub = rospy.Subscriber(f"/{vessel_name}/reference", REFMSG, refCallback)
-    # obs_sub = rospy.Subscriber(f"/{vessel_name}/observer_states", OBSERVERMESSAGE, obsCallback)
+    reference_sub = rospy.Subscriber(
+        f"/{vessel_name}/reference", Reference, refCallback)
+    obs_sub = rospy.Subscriber(
+        f"/{vessel_name}/observer_states", Observer_state, obsCallback)
 
     # Publishers
     tauCmd_pub = rospy.Publisher(

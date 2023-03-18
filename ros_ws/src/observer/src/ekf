@@ -3,6 +3,7 @@ import rospy
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
+from messages.msg import Observer_state
 
 
 def odomCallback(msg):
@@ -28,9 +29,11 @@ if __name__ == '__main__':
         f"/{vessel_name}/tau", Float64MultiArray, tauCallback)
 
     # Publishers
-    # observer states
+    obs_pub = rospy.Publisher(
+        f"/{vessel_name}/observer_states", Observer_state, queue_size=1)
 
     # Messages
+    obs_msg = Observer_state()
 
     while not rospy.is_shutdown():
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 
-from std_msgs.msg import Float64MultiArray
+from messages.msg import Observer_state, Reference
 
 
 def obsCallback(msg):
@@ -16,10 +16,12 @@ if __name__ == '__main__':
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
     # Subscribers
-    # observer_sub = rospy.Subscriber(f"/{vessel_name}/observer_states", OBSSTATES, tauCmdCallback)
+    obs_sub = rospy.Subscriber(
+        f"/{vessel_name}/observer_states", Observer_state, obsCallback)
 
     # Publishers
-    # reference_pub = rospy.Publisher(f"/{vessel_name}/reference", REFMSG, queue_size=1)
+    reference_pub = rospy.Publisher(
+        f"/{vessel_name}/reference", Reference, queue_size=1)
 
     # Messages
 
