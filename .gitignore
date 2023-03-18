@@ -146,3 +146,7 @@ ffmpeg.exe
 
 notebooks/
 notebooks/*
+
+# Ignore ros build and devel files
+.devel/
+.build/
