@@ -2,8 +2,8 @@
 import rospy
 import numpy as np
 
-import nav_msgs.msg as Odometry
-import std_msgs.msg as Float64MultiArray
+from std_msgs.msg import Float64MultiArray
+from nav_msgs.msg import Odometry
 
 
 def uCallback(msg):
@@ -16,17 +16,17 @@ def alphaCallback(msg):
 
 if __name__ == '__main__':
     vessel_name = "csad"
-
     rospy.init_node(f"{vessel_name}")
     rospy.loginfo(f"INITIALIZING {vessel_name} SIMULATION NODE")
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
     # Subscribers
+
     tau_sub = rospy.Subscriber(
-        f"/{vessel_name}/u", Float64MultiArray, uCallback, queue_size=1)
+        f"/{vessel_name}/u", Float64MultiArray, uCallback)
     alpha_sub = rospy.Subscriber(
-        f"/{vessel_name}/alpha", Float64MultiArray, alphaCallback, queue_size=1)
+        f"/{vessel_name}/alpha", Float64MultiArray, alphaCallback)
 
     # Publishers
     odom_pub = rospy.Publisher(
@@ -35,12 +35,10 @@ if __name__ == '__main__':
         f"/{vessel_name}/tau", Float64MultiArray, queue_size=1)
 
     # Messages
-    odom_msg = Odometry()
-    tau_msg = Float64MultiArray()
+    # odom_msg = Odometry()
+    # tau_msg = Float64MultiArray()
 
     while not rospy.is_shutdown():
-        odom_pub.publish(odom_msg)
-        tau_pub.publish(tau_msg)
 
         r.sleep()
 
