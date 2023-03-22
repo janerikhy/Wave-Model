@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+import math
+
+from MCSimPython.control.basic import PD
+
+from std_msgs.msg import Float64MultiArray
+
+
+vessel_name = "CSAD"
+
+
+class Controller (object):
+    def __init__(self, dt=0.01) -> None:
+        self.kp = np.array([10., 10., 50.])  # Proportional gain
+        self.kd = np.array([100.5, 100.5, 200.])  # Derivative gain
+
+        # gains from MCSimPython package
+        self.pd = PD(kp=self.kp, kd=self.kd, dt=dt)
+
+        self.tau = np.zeros(3)  # Command forces [surge, sway, yaw]
+        self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
+        self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
+
+        self.eta_d = np.zeros(3)  # Desired pose, attitude [surge, sway, yaw]
+        self.nu_d = np.zeros(3)   # Desired velocity [surge, sway, yaw]
+
+        # Publishers/Subscribers
+        self.odom_sub = rospy.Subscriber(
+            f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
+        # Desired state subscriber
+        self.desiredState_sub = rospy.Subscriber(
+            f"/{vessel_name}/reference", Float64MultiArray, self.referenceCallback, queue_size=1)
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
+
+        # Messages
+        self.tau_msg = Float64MultiArray()  # command forces [surge, sway, yaw]
+
+    def observerCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.eta = msg.data[0:3]
+        self.nu = msg.data[3:6]
+
+    def referenceCallback(self, msg):
+        """
+            Callback function for desired state message. Updating desired position/attitude and linear/angular velocity of vessel.
+        """
+        self.eta_d = np.array(msg.data[0:3])
+        self.nu_d = np.array(msg.data[3:6])
+
+    def update(self):
+        """
+            Calculate desired forces. [surge, sway, yaw]
+        """
+        # Calculate desired forces
+        self.tau = self.pd.get_tau(self.eta, self.eta_d, self.nu, self.nu_d)
+
+    def publishTau(self):
+        """
+            Publish desired forces. [surge, sway, yaw]
+        """
+        self.tau_msg.data = self.tau
+        self.tau_pub.publish(self.tau_msg)
+
+
+if __name__ == '__main__':
+    rospy.init_node("controller")
+    rospy.loginfo(f"INITIALIZING {vessel_name} PID CONTROLLER NODE")
+    r = rospy.Rate(100)
+    dt = 0.01  # Timestep corresponding to sampling frequency of 100 Hz
+
+    # initialize reference model
+    controller = Controller(dt=dt)
+
+    while not rospy.is_shutdown():
+        # calculate command forces
+        controller.update()
+
+        # publish command forces
+        controller.publishTau()
+
+        r.sleep()
+
+    rospy.spin()
+    rospy.shutdown()
