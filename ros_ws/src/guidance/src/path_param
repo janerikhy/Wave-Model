@@ -20,7 +20,7 @@ class ReferenceModel (object):
 
         # Reference model for waypoint following (surge, sway, yaw)
         self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.03, 0.01, 0.002])  # , omega=[0.2, 0.05, 0.02])
+            dt=dt, omega=[0.4, 0.03, 0.3])  # , omega=[0.2, 0.05, 0.02])
 
         # Waypoints
         x_start = 0.0
@@ -29,10 +29,13 @@ class ReferenceModel (object):
         self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
-                       np.array([0.0 + x_start, 1.0 + y_start, 0.0]),
-                       np.array([0.0 + x_start, 0.0 + y_start, 0.0])]   # Waypoints list
+                       np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
+                       np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list
         self.wpIndex = 0                            # Index of current waypoint
-        self.acceptanceRadius = 0.05                # Acceptance radius for waypoint
+        # Acceptance radius for waypoint switching logic
+        self.acceptanceRadius = 0.05
+        # Heading threshold for waypoint switching logic
+        self.headingThreshold = 0.5*np.pi/180.0
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -76,7 +79,8 @@ class ReferenceModel (object):
             Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
         """
         # check if current waypoint is reached
-        if np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius:
+        if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
+                (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
             self.wpIndex += 1
 
             print("waypoint:", self.wpList[self.wpIndex])
