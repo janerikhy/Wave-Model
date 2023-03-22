@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+
+from sensor_msgs.msg import Joy
+from std_msgs.msg import Float64MultiArray
+
+vessel_name = "CSAD"
+
+
+class JoyCtrl(object):
+    def __init__(self) -> None:
+        self.tau_ref = np.zeros(3)
+        self.angle = 0.0
+
+        # Publishers/Subscribers
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)
+        self.joy_sub = rospy.Subscriber(
+            "/joy", Joy, self.callback, queue_size=1)
+
+        # Messages
+        self.tau_msg = Float64MultiArray()
+
+        self.u_msg = Float64MultiArray()
+
+    def callback(self, data):
+        """
+            Maps the sixaxis playstation controller inputs
+            to the command forces.
+        """
+        L2 = data.axes[3]
+        R2 = data.axes[4]
+
+        lStickY = data.axes[1]
+        rStickX = -data.axes[2]
+
+        # calculate command force form joystick input
+        self.tau_ref[0] = lStickY
+        self.tau_ref[1] = rStickX
+        self.tau_ref[2] = (L2 - R2)*0.5
+
+        # Only publish when commands is given from the controller
+        if np.linalg.norm(self.tau_ref) != 0.01:
+            self.publish()
+
+    def publish(self):
+        """
+            Publish command forces to tau topic.
+        """
+        # update message
+        self.tau_msg.data = self.tau_ref
+
+        # publish message
+        self.tau_pub.publish(self.tau_msg)
+
+
+if __name__ == '__main__':
+    rospy.init_node("joy_controller")
+    rospy.loginfo(f"INITIALIZING {vessel_name}JOYSTICK CONTROLLER NODE")
+    r = rospy.Rate(100)
+
+    joyCtrl = JoyCtrl()
+
+    while not rospy.is_shutdown():
+        r.sleep()
+
+    rospy.spin()
+    rospy.shutdown()
