@@ -1,31 +1,156 @@
 #!/usr/bin/env python3
 import rospy
+import numpy as np
+import math
 
-from messages.msg import Observer_state, Reference
+from MCSimPython.guidance.filter import ThrdOrderRefFilter
+
+from std_msgs.msg import Float64MultiArray
+
+vessel_name = "CSAD"
 
 
-def obsCallback(msg):
-    pass
+class ReferenceModel (object):
+    def __init__(self, dt=0.01) -> None:
+        self.dt = dt            # Timestep
+        self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
+        self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
+
+        self.eta_d = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
+        self.nu_d = np.zeros(3)  # Velocity [surge, sway, yaw]
+
+        # Reference model for waypoint following (surge, sway, yaw)
+        self.wpRefModel = ThrdOrderRefFilter(
+            dt=dt, omega=[0.03, 0.01, 0.002])  # , omega=[0.2, 0.05, 0.02])
+
+        # Waypoints
+        x_start = 0.0
+        y_start = 0.0
+
+        self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
+                       np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
+                       np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
+                       np.array([0.0 + x_start, 1.0 + y_start, 0.0]),
+                       np.array([0.0 + x_start, 0.0 + y_start, 0.0])]   # Waypoints list
+        self.wpIndex = 0                            # Index of current waypoint
+        self.acceptanceRadius = 0.05                # Acceptance radius for waypoint
+
+        # Subscribers/Publishers
+        self.desiredState_pub = rospy.Publisher(
+            f"/{vessel_name}/reference", Float64MultiArray, queue_size=1)             # Desired state publishe
+        self.odom_sub = rospy.Subscriber(
+            f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
+
+        # Messages
+        # Desired position and attitude message
+        self.reference_msg = Float64MultiArray()        # desired state message
+        self.observer_msg = Float64MultiArray()    # Odometry message
+
+    def observerCallback(self, msg):
+        """
+            Observer callback.
+        """
+        # update state
+        self.eta = msg.data[0:3]
+        self.nu = msg.data[3:6]
+
+    def publishDesiredState(self):
+        """
+            Publish desired state. 
+        """
+        # update message
+        self.reference_msg.data[0:3] = self.eta_d
+        self.reference_msg.data[3:6] = self.nu_d
+
+        # Publish desired state
+        self.desiredState_pub.publish(self.reference_msg)
+
+    def setWaypoints(self):
+        """
+            Set current waypoint.  
+        """
+        self.wpRefModel.set_eta_r(
+            self.wpList[self.wpIndex])   # [surge, sway, yaw]
+
+    def updateWayPoint(self):
+        """
+            Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
+        """
+        # check if current waypoint is reached
+        if np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius:
+            self.wpIndex += 1
+
+            print("waypoint:", self.wpList[self.wpIndex])
+            print("index:", self.wpIndex)
+
+            # if last waypoint is reached, start over
+            if self.wpIndex >= len(self.wpList):
+                self.wpIndex = 0
+
+    def updateDesiredPath(self):
+        """
+            Update desired path. 
+        """
+        # update reference model
+        self.wpRefModel.update()
+
+        # get desired state
+        self.eta_d = self.wpRefModel.get_eta_d()
+        self.nu_d = self.wpRefModel.get_eta_d_dot()
+
+    def popWaypoint(self):
+        """
+            Pop current waypoint. 
+        """
+        self.wpList.pop(self.wpIndex)
+
+    def addWaypoint(self, waypoint):
+        """
+            Add waypoint. 
+        """
+        self.wpList.append(waypoint)
+
+    def clearWaypoints(self):
+        """
+            Clear waypoints. 
+        """
+        self.wpList = []
+        self.wpIndex = 0
+
+    def getWaypoints(self):
+        """
+            Get waypoints. 
+        """
+        return self.wpList
+
+    def getWaypointIndex(self):
+        """
+            Get waypoint index. 
+        """
+        return self.wpIndex
 
 
 if __name__ == '__main__':
-    vessel_name = "CSAD"
-    rospy.init_node(f"{vessel_name}_guidance")
+    rospy.init_node("guidance")
     rospy.loginfo(f"INITIALIZING {vessel_name} GUIDANCE NODE")
     r = rospy.Rate(100)
-    dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
+    dt = 0.01  # Timestep corresponding to sampling frequency of 100 Hz
 
-    # Subscribers
-    obs_sub = rospy.Subscriber(
-        f"/{vessel_name}/observer_states", Observer_state, obsCallback)
-
-    # Publishers
-    reference_pub = rospy.Publisher(
-        f"/{vessel_name}/reference", Reference, queue_size=1)
-
-    # Messages
+    # initialize reference model
+    referenceModel = ReferenceModel(dt=dt)
 
     while not rospy.is_shutdown():
+        # check if current waypoint is reached
+        referenceModel.updateWayPoint()
+
+        # set waypoint
+        referenceModel.setWaypoints()
+
+        # calculate desired path
+        referenceModel.updateDesiredPath()
+
+        # publish desired state
+        referenceModel.publishDesiredState()
 
         r.sleep()
 
