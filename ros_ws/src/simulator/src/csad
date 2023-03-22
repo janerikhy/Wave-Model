@@ -147,8 +147,8 @@ class CSAD (object):
         self.nu = self.model.get_nu() + np.random.normal(0, 0.001, 6)
 
         # attitude with noise
-        self.eta[3:6] = self.eta[3:6]*np.pi/180.0
-        self.nu[3:6] = self.nu[3:6]*np.pi/180.0
+        self.eta[3:6] += np.random.normal(0, 0.001, 3)*np.pi/180.0
+        self.nu[3:6] += np.random.normal(0, 0.001, 3)*np.pi/180.0
 
         # update odometry message
         self.update_odom_msg()
