@@ -1,16 +1,165 @@
 #!/usr/bin/env python3
 import rospy
+import numpy as np
+
+from MCSimPython.simulator import CSAD_DP_6DOF
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 
 
-def uCallback(msg):
-    pass
+class CSAD (object):
+    def __init__(self, dt=0.01) -> None:
+        self.eta = np.zeros(6)  # Pose and attitude
+        self.nu = np.zeros(6)   # Linear and angular velocity
+        self.Uc = 0.0
+        self.beta_c = 0.0
 
+        self.model = CSAD_DP_6DOF(dt=dt)
 
-def alphaCallback(msg):
-    pass
+        self.n_thrusters = 6                # Number of thrusters
+        self.u = np.zeros(6)                # Thruster force
+        self.alpha = np.zeros(6)            # Thruster angle
+        self.tau = np.zeros(6)              # Total loads
+        self.tau_wave = np.zeros(6)         # Wave loads
+        self.tau_thruster = np.zeros(6)     # Thruster loads
+
+        # thruster position in BODY-frame
+        self.Lx = np.array(
+            [1.0678, 0.9344, 0.9344, -1.1644, -0.9911, -0.9911])
+        self.Ly = np.array([0.0, 0.11, -0.11, 0.0, -0.1644, 0.1644])
+
+        # Thrust koefficient BODY-frame
+        self.K = np.diag([0.3763, 0.3901, 0.3776, 0.5641,
+                          0.4799, 0.5588])
+
+        # Exended thrust koefficient
+        self.B = np.zeros((3, 6))
+
+        # Subscribers/ublishers
+        self.tau_sub = rospy.Subscriber(
+            f"/{vessel_name}/u", Float64MultiArray, self.uCallback)
+        self.alpha_sub = rospy.Subscriber(
+            f"/{vessel_name}/alpha", Float64MultiArray, self.alphaCallback)
+
+        self.odom_pub = rospy.Publisher(
+            f"/qualisys/{vessel_name}/odom", Odometry, queue_size=1)
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau", Float64MultiArray, queue_size=1)
+
+        # Messages
+        self.odom_msg = Odometry()
+        self.tau_msg = Float64MultiArray()
+
+    def yaw2quat(self, yaw):
+        """
+            Convert yaw to quaternion.
+        """
+        quat = np.zeros(4)
+        quat[0] = np.cos(yaw/2)
+        quat[1] = 0
+        quat[2] = 0
+        quat[3] = np.sin(yaw/2)
+
+        return quat
+
+    def uCallback(self, msg):
+        """
+            Update u.
+        """
+        self.u = msg.data
+
+    def alphaCallback(self, msg):
+        """
+            Update alpha.
+        """
+        self.alpha = msg.data
+
+    def updateTauThruster(self):
+        """
+            Update thruster loads from thrusters u and alpha.
+        """
+        self.B = np.array([np.cos(self.alpha),
+                          np.sin(self.alpha),
+                           self.Lx*np.sin(self.alpha) - self.Ly*np.cos(self.alpha)])
+        tau = (self.B@self.K)@self.u
+
+        self.tau_thruster = np.array(
+            [tau[0], tau[1], 0, 0, 0, tau[2]])
+
+    def updateTauWave(self):
+        """
+            Calculate wave load. TODO: Wave model not included.
+        """
+        self.tau_wave = np.zeros(6)
+
+    def updateTau(self):
+        """
+            Update total loads from wave loads and thruster loads.
+        """
+        # calculate wave loads
+        self.updateTauWave()
+
+        # calculate thruster loads
+        self.updateTauThruster()
+        self.tau_msg.data = [self.tau_thruster[0],
+                             self.tau_thruster[1],
+                             self.tau_thruster[5]]
+
+        self.tau = self.tau_wave + self.tau_thruster
+
+    def update_odom_msg(self):
+        """
+            Update odometry message with new position and attitude of vessel.
+        """
+        quat = self.yaw2quat(self.eta[5])    # Convert yaw to quaternions
+
+        # pose
+        self.odom_msg.pose.pose.position.x = self.eta[0]
+        self.odom_msg.pose.pose.position.y = self.eta[1]
+        self.odom_msg.pose.pose.position.z = self.eta[2]
+
+        # attitude
+        self.odom_msg.pose.pose.orientation.w = quat[0]
+        self.odom_msg.pose.pose.orientation.x = quat[1]
+        self.odom_msg.pose.pose.orientation.y = quat[2]
+        self.odom_msg.pose.pose.orientation.z = quat[3]
+
+        # linear velocity
+        self.odom_msg.twist.twist.linear.x = self.nu[0]
+        self.odom_msg.twist.twist.linear.y = self.nu[1]
+        self.odom_msg.twist.twist.linear.z = self.nu[2]
+
+        # Angular velocity
+        self.odom_msg.twist.twist.angular.x = self.nu[3]
+        self.odom_msg.twist.twist.angular.y = self.nu[4]
+        self.odom_msg.twist.twist.angular.z = self.nu[5]
+
+    def updateState(self):
+        """
+            Update pos and attitude.
+        """
+
+        self.model.integrate(self.Uc, self.beta_c, csad.tau)
+
+        # pose with noise
+        self.eta = self.model.get_eta() + np.random.normal(0, 0.001, 6)
+        self.nu = self.model.get_nu() + np.random.normal(0, 0.001, 6)
+
+        # attitude with noise
+        self.eta[3:6] = self.eta[3:6]*np.pi/180.0
+        self.nu[3:6] = self.nu[3:6]*np.pi/180.0
+
+        # update odometry message
+        self.update_odom_msg()
+
+    def publish(self):
+        """
+            Publish actual thruster load produces and position of vessel.
+        """
+        self.odom_pub.publish(self.odom_msg)
+
+        self.tau_pub.publish(self.tau_msg)
 
 
 if __name__ == '__main__':
@@ -20,24 +169,17 @@ if __name__ == '__main__':
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
-    # Subscribers
-
-    tau_sub = rospy.Subscriber(
-        f"/{vessel_name}/u", Float64MultiArray, uCallback)
-    alpha_sub = rospy.Subscriber(
-        f"/{vessel_name}/alpha", Float64MultiArray, alphaCallback)
-
-    # Publishers
-    odom_pub = rospy.Publisher(
-        f"/qualisys/{vessel_name}/odom", Odometry, queue_size=1)
-    tau_pub = rospy.Publisher(
-        f"/{vessel_name}/tau", Float64MultiArray, queue_size=1)
-
-    # Messages
-    odom_msg = Odometry()
-    tau_msg = Float64MultiArray()
+    csad = CSAD(dt=dt)
 
     while not rospy.is_shutdown():
+        # calculate total loads
+        csad.updateTau()
+
+        # find vessel position
+        csad.updateState()
+
+        # publish vessel position and actual thrust load produced
+        csad.publish()
 
         r.sleep()
 
