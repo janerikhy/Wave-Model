@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+import math
+
+from std_msgs.msg import Float64MultiArray
+from nav_msgs.msg import Odometry
+from messages.msg import Observer_state
+
+
+vessel_name = "CSAD"
+
+
+class Observer(object):
+    def __init__(self, dt=1/100.0, L1=np.eye(3, 3), L2=np.eye(3, 3), L3=np.eye(3, 3), L4=np.concatenate((np.eye(3, 3), np.eye(3, 3)), axis=0), Tb=np.diag((100, 100, 100)), Tp=1) -> None:
+        # from MCSimPython
+        self.M = np.array([[128.9965958387293, 0.0, 0.0],
+                           [0.0, 139.144401, 0.59218287],
+                           [0.0, 0.59218287, 70.16320879999999]
+                           ])
+
+        # from MCSimPython
+        self.D = np.array([[68.71325624507736, 0.0, 0.0],
+                           [0.0, 538.44958, 43.089149],
+                           [0.0, 43.089149, 225.60416]
+                           ])
+
+        self.M_inv = np.linalg.inv(self.M)  # Inertia matrix inverse
+
+        # Injection gains
+        self.L1 = L1  # pos gain
+        self.L2 = L2  # vel gain
+        self.L3 = L3  # bias gain
+        self.L4 = L4  # wave gain
+
+        # bias time constant 1000/sqrt(scale)
+        self.Tb_inv = np.linalg.pinv(Tb)
+
+        # Lambda matrix
+        self.Omega = np.diag((1, 1, 1))*2*np.pi/Tp
+        self.Lambda = np.diag((1, 1, 1))
+        self.zeta = 0.05
+
+        self.A_w = np.concatenate((np.concatenate((np.zeros((3, 3)), np.eye(3, 3)), axis=1),
+                                   np.concatenate((-self.Omega@self.Omega, -2*self.Lambda@self.Omega), axis=1)), axis=0)
+        self.C_w = np.concatenate(
+            (np.zeros((3, 3)), np.eye(3, 3)), axis=1)  # WF dynamics
+
+        self.dt = dt                     # sampling rate
+        self.eta = np.zeros((3, 1))      # position measurement
+        self.y_tilde = np.zeros((3, 1))  # position error
+        self.y_hat = np.zeros((3, 1))    # estimated error
+
+        # Estimates
+        self.eta_hat = np.zeros((3, 1))   # position estimate
+        self.nu_hat = np.zeros((3, 1))    # velocity estimate
+        self.bias_hat = np.zeros((3, 1))  # bias estimate
+        self.xi_hat = np.zeros((6, 1))    # wave motion estimate
+
+        # Estimate derivatives
+        self.eta_hat_dot = np.zeros((3, 1))   # position derivative estimate
+        self.nu_hat_dot = np.zeros((3, 1))    # velocity derivative estimate
+        self.bias_hat_dot = np.zeros((3, 1))  # bias derivative estimate
+        self.xi_hat_dot = np.zeros((3, 1))    # wave motion derivative estimate
+
+        # Actual thrust force
+        self.tau = np.zeros((3, 1))  # actual actuator force produced
+
+        # Rotation Matrix
+        self.R = np.zeros(3)    # : rotation matrix
+        self.R_T = np.zeros(3)  # : rotation matrix transpose
+
+        # Publishe/Subscribe
+        self.pub = rospy.Publisher(
+            f"/{vessel_name}/observer_states", Float64MultiArray, queue_size=1)         # publishing estimated pos, vel, bias and wave
+        self.subTau = rospy.Subscriber(
+            f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
+        self.odom_sub = rospy.Subscriber(
+            f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)  # Odometry subscriber
+
+        # Messages
+        self.observer_msg = Float64MultiArray()
+
+    def updateEta(self, eta):
+        """
+            Updates the position measurement. Used for offline testing.
+        """
+        self.eta[0] = eta[0]
+        self.eta[1] = eta[1]
+        self.eta[2] = eta[2]
+
+    def updateTau(self, tau):
+        """
+            Updates the actual thrust force. Used for offline testing.
+        """
+        self.tau[0] = tau[0]
+        self.tau[1] = tau[1]
+        self.tau[2] = tau[2]
+
+    def updateGains(self, L1, L2, L3, L4):
+        """
+            Updates the gains. Used for offline testing.
+        """
+        self.L1 = L1
+        self.L2 = L2
+        self.L3 = L3
+        self.L4 = L4
+
+    def updateR(self):
+        """
+            Updates the rotation matrix.
+        """
+        psi = self.eta[2][0]
+
+        self.R = np.array([[np.cos(psi), -np.sin(psi), 0],
+                           [np.sin(psi), np.cos(psi), 0],
+                           [0, 0, 1]])
+        self.R_T = self.R.T
+
+    def y_tilde_update(self):
+        """
+            Updates the measurement error. Keeping the yaw error between [-pi, pi].
+        """
+        self.y_tilde[0] = self.eta[0] - self.y_hat[0]
+        self.y_tilde[1] = self.eta[1] - self.y_hat[1]
+
+        angle = self.eta[2] - self.y_hat[2]
+        self.y_tilde[2] = np.mod(angle + np.pi, 2*np.pi) - np.pi
+
+    def wrap(self, angle):
+        """
+            Keeps the angle between [-pi, pi].
+        """
+        return np.arctan2(np.sin(angle), np.cos(angle))
+
+    def psi_filter(self, psi_prev, psi_curr):
+        """
+            Lifts angle and makes it continous.
+        """
+        tmp = np.fix(((psi_prev))/(2*np.pi))
+
+        n = tmp
+        psi_tmp = 2*np.pi*n + psi_curr
+
+        theta_tilde = psi_tmp - psi_prev
+
+        s = np.sign(theta_tilde)
+        if abs(theta_tilde) > np.pi:
+            psi_temp = (psi_tmp-2*np.pi*s)
+        else:
+            psi_temp = psi_tmp
+
+        psi = psi_temp
+        psi_prev = psi
+
+        return psi
+
+    def update(self):
+        """
+            Updates the observer estimates.
+        """
+        self.updateR()
+        self.y_tilde_update()
+
+        # Calculate derivatives
+        self.eta_hat_dot = self.R@self.nu_hat + self.L1@self.y_tilde
+        self.nu_hat_dot = self.M_inv@(-self.D@self.nu_hat + self.R_T @
+                                      self.bias_hat + self.tau + self.R_T@self.L2@self.y_tilde)
+        self.b_hat_dot = -self.Tb_inv@self.bias_hat + self.L3@self.y_tilde
+        self.xi_hat_dot = self.A_w@self.xi_hat + self.L4@self.y_tilde
+
+        # Euler integration
+        self.eta_hat = self.eta_hat + self.dt*self.eta_hat_dot
+        self.nu_hat = self.nu_hat + self.dt*self.nu_hat_dot
+        self.bias_hat = self.bias_hat + self.dt*self.b_hat_dot
+        self.xi_hat = self.xi_hat + self.dt*self.xi_hat_dot
+
+        # Wrap eta_hat
+        self.eta_hat[2][0] = self.wrap(
+            self.eta_hat[2][0])  # Not sure if I need
+
+        self.y_hat = self.eta_hat + self.C_w@self.xi_hat
+
+    def publish(self):
+        """
+            Publishes the observer estimates.
+        """
+        # update message
+        self.observer_msg.data[0:3] = self.eta_hat
+        self.observer_msg.data[3:6] = self.nu_hat
+        self.observer_msg.data[6:9] = self.bias_hat
+        self.observer_msg.data[9:15] = self.xi_hat
+
+        # publish message
+        self.pub.publish(self.observer_msg)
+
+    def tauCallback(self, msg):
+        """
+            Callback function for actual thrust force. Updating tau.
+        """
+        self.tau = np.resize(msg.data[:3], (3, 1))
+
+    def odomCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.odom_msg = msg
+
+        # Quaternions
+        w = msg.pose.pose.orientation.w
+        x = msg.pose.pose.orientation.x
+        y = msg.pose.pose.orientation.y
+        z = msg.pose.pose.orientation.z
+
+        # Position and attitude
+        self.eta[0] = msg.pose.pose.position.x
+        self.eta[1] = msg.pose.pose.position.y
+        self.eta[2] = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)
+                                 )     # quaternion to euler
+
+        # Linear and angular velocity
+        # self.nu[0] = msg.twist.twist.linear.x
+        # self.nu[1] = msg.twist.twist.linear.y
+        # self.nu[2] = msg.twist.twist.angular.z
+
+
+if __name__ == '__main__':
+    rospy.init_node("observer")
+    rospy.loginfo("INITIALIZING OBSERVER NODE")
+    r = rospy.Rate(100)
+
+    observer = Observer()
+
+    while not rospy.is_shutdown():
+        # update
+        observer.update()
+
+        # publish
+        observer.publish()
+
+        r.sleep()
+
+    rospy.spin()
+    rospy.shutdown()
