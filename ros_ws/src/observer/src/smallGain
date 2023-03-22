@@ -5,7 +5,6 @@ import math
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
-from messages.msg import Observer_state
 
 
 vessel_name = "CSAD"
