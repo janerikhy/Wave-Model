@@ -16,11 +16,11 @@ class ReferenceModel (object):
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
         self.eta_d = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
-        self.nu_d = np.zeros(3)  # Velocity [surge, sway, yaw]
+        self.nu_d = np.zeros(3)   # Velocity [surge, sway, yaw]
 
         # Reference model for waypoint following (surge, sway, yaw)
         self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.4, 0.03, 0.3])  # , omega=[0.2, 0.05, 0.02])
+            dt=dt, omega=[0.2, 0.02, 0.05])  # omega=[0.2, 0.05, 0.02])
 
         # Waypoints
         x_start = 0.0
@@ -81,14 +81,15 @@ class ReferenceModel (object):
         # check if current waypoint is reached
         if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
                 (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
-            self.wpIndex += 1
 
-            print("waypoint:", self.wpList[self.wpIndex])
-            print("index:", self.wpIndex)
+            self.wpIndex += 1
 
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
                 self.wpIndex = 0
+
+            print("waypoint:", self.wpList[self.wpIndex])
+            print("index:", self.wpIndex)
 
     def updateDesiredPath(self):
         """

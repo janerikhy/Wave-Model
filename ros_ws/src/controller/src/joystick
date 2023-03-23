@@ -22,8 +22,6 @@ class JoyCtrl(object):
         # Messages
         self.tau_msg = Float64MultiArray()
 
-        self.u_msg = Float64MultiArray()
-
     def callback(self, data):
         """
             Maps the sixaxis playstation controller inputs
