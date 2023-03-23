@@ -81,14 +81,16 @@ class ReferenceModel (object):
         # check if current waypoint is reached
         if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
                 (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
-            self.wpIndex += 1
 
-            print("waypoint:", self.wpList[self.wpIndex])
-            print("index:", self.wpIndex)
+
+            self.wpIndex += 1
 
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
                 self.wpIndex = 0
+
+            print("waypoint:", self.wpList[self.wpIndex])
+            print("index:", self.wpIndex)
 
     def updateDesiredPath(self):
         """
