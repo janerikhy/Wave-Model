@@ -1,16 +1,61 @@
 #!/usr/bin/env python3
 import rospy
+import numpy as np
+
 from MCSimPython.thrust_allocation.thruster import Thruster
 from MCSimPython.thrust_allocation.allocation import fixed_angle_allocator
 import MCSimPython.vessel_data.CSAD.thruster_data as data 
 
 from std_msgs.msg import Float64MultiArray
 
+class ThrustAllocFixed(object):
+    def __init__(self) -> None:
+
+        self.u = np.zeros(6)
+        self.alpha = np.zeros(6)
+        
+
+        self.tau_cmd = np.zeros(3)
+
+        self.allocate = fixed_angle_allocator()
+
+        # Set thruster configuration
+        for i in range(6):
+            self.allocate.add_thruster(Thruster((data.lx[i], data.ly[i]), data.K[i]))
 
 
-def tauCmdCallback(msg):
-    
-    tau = msg.data
+        # Publishers/Subscribers
+        self.u_pub = rospy.Publisher(
+            f"/{vessel_name}/u", Float64MultiArray, queue_size=1)
+        self.alpha_pub = rospy.Publisher(
+            f"/{vessel_name}/alpha", Float64MultiArray, queue_size=1)
+        self.tau_sub = rospy.Subscriber(
+        f"/CSAD/tau_cmd", Float64MultiArray, self.tauCmdCallback, queue_size=1)
+
+        # Messages
+        self.u_msg = Float64MultiArray()
+        self.alpha_msg = Float64MultiArray()
+
+
+    def update(self):
+        self.u, self.alpha = self.allocate.allocate(self.tau_cmd)
+        
+
+
+    def tauCmdCallback(self, msg):
+        """
+            Allocate the forces to be  produced by each thruster, and publish the command forces to the u topic.
+        """
+        self.tau_cmd = msg.data
+
+    def publish(self):
+         # update message
+        self.u_msg.data = self.u
+        self.alpha_msg.data = self.alpha
+
+        # publish messsage
+        self.u_pub.publish(self.u_msg)
+        self.alpha_pub.publish(self.alpha_msg)
 
     
 
@@ -23,26 +68,13 @@ if __name__ == '__main__':
     #dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
     # Actuators
-    allocator = fixed_angle_allocator()
+    allocator = ThrustAllocFixed()
 
-    # Set thruster configuration
-    for i in range(6):
-        allocator.add_thruster(Thruster((data.lx[i], data.ly[i]), data.K[i]))
-
-
-    # Subscribers
-    tauCmd_sub = rospy.Subscriber(
-        f"/{vessel_name}/tau_cmd", Float64MultiArray, tauCmdCallback)
-
-    # Publishers
-    u_pub = rospy.Publisher(
-        f"/{vessel_name}/u", Float64MultiArray, queue_size=1)
-    alpha_pub = rospy.Publisher(
-        f"/{vessel_name}/alpha", Float64MultiArray, queue_size=1)
-
-    # Messages
 
     while not rospy.is_shutdown():
+        allocator.update()
+
+        allocator.publish()
 
         r.sleep()
 
