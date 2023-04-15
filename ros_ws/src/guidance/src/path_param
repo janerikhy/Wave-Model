@@ -56,6 +56,16 @@ class ReferenceModel (object):
         self.eta = msg.data[0:3]
         self.nu = msg.data[3:6]
 
+    def waypointListCallback(self, msg):
+        """
+            Waypoint list callback.
+        """
+        # update waypoint list
+        self.wpList = msg.data
+
+        # reset waypoint index
+        self.wpIndex = 0
+
     def publishDesiredState(self):
         """
             Publish desired state. 
@@ -132,6 +142,13 @@ class ReferenceModel (object):
             Get waypoint index. 
         """
         return self.wpIndex
+
+    def replaceWaypointList(self, waypointList):
+        """
+            Replace waypoint. 
+        """
+        self.wpList = waypointList
+        self.wpIndex = 0
 
 
 if __name__ == '__main__':
