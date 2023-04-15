@@ -4,10 +4,10 @@ import MCSimPython.vessel_data.CSAD.thruster_data as data
 
 class ThrusterDynamics:
 
-    def __init__(self, u, alpha, dt):
-        self._u = u
-        self._alpha = alpha
-        self._dt = dt
+    def __init__(self):
+        #self._u = u
+        #self._alpha = alpha
+        #self._dt = dt
 
         self._K = np.diag(data.K)
         self._lx = data.lx
