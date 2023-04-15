@@ -4,7 +4,33 @@ import rospy
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 from messages.msg import Observer_state, Reference
+from MCSimPython.control.adaptiveFS import AdaptiveFSController
+from MCSimPython.simulator import CSAD_DP_6DOF 
+import numpy as np
 
+vessel_name = 'CSAD'
+
+class Controller(object):
+    def __init__(self, dt=0.01) -> None:
+        self.vessel = CSAD_DP_6DOF(dt)
+        self.FS = AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
+
+        self.tau = np.zeros(3)
+        self.eta = np.zeros(3)
+        self.nu = np.zeros(3)
+
+        self.eta_d = np.zeros(3)
+        self.eta_d_dot = np.zeros(3)
+        self.eta_d_ddot = np.zeros(3)
+        
+        # Publishers/Subscribers
+        self.odom_sub = rospy.Subscriber(
+            f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
+        # Desired state subscriber
+        self.desiredState_sub = rospy.Subscriber(
+            f"/{vessel_name}/reference", Float64MultiArray, self.referenceCallback, queue_size=1)
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
 
 def refCallback(msg):
     pass
