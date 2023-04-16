@@ -10,8 +10,9 @@ from nav_msgs.msg import Odometry
 
 import time
 
+
 class CSAD (object):
-    def __init__(self, dt=0.01) -> None:
+    def __init__(self, dt=0.01, waveActive=False) -> None:
         self.eta = np.zeros(6)  # Pose and attitude
         self.nu = np.zeros(6)   # Linear and angular velocity
         self.Uc = 0.0
@@ -29,7 +30,7 @@ class CSAD (object):
         # Wave spectra
         hs = 0.03    # Signifcant wave height
         tp = 1.0    # Peak wave period
-        gamma = 3.3 # Peakedness factor of wave spectra
+        gamma = 3.3  # Peakedness factor of wave spectra
 
         wp = 2*np.pi/tp
         wmin = 0.5*wp
@@ -41,12 +42,12 @@ class CSAD (object):
         _, wave_spectra = jonswap(hs=hs, tp=tp, gamma=gamma)
 
         # Wave loads
+        self.waveActive = waveActive
         dw = (wmax - wmin)/N      # Space between each frequency component
         wave_amps = np.sqrt(2*wave_spectra*dw)   # Calculate wave amplitudes
-        rand_phase = np.random.uniform(0, 2*np.pi, size=N) # Random phase
-        wave_angles = np.ones(N)*np.pi # Waves going south
+        rand_phase = np.random.uniform(0, 2*np.pi, size=N)  # Random phase
+        wave_angles = np.ones(N)*np.pi  # Waves going south
 
-        
         self.waveload = WaveLoad(
             wave_amps=wave_amps,
             freqs=wave_freqs,
@@ -54,8 +55,10 @@ class CSAD (object):
             angles=wave_angles,
             config_file=self.model._config_file,
             interpolate=True,
-            qtf_method="geo-mean",      # Use geometric mean to approximate the QTF matrices.
-            deep_water=True # kan sette dybde her (1.4) Deep water er da false og legger til dept = 1.4
+            # Use geometric mean to approximate the QTF matrices.
+            qtf_method="geo-mean",
+            # kan sette dybde her (1.4) Deep water er da false og legger til dept = 1.4
+            deep_water=True
         )
 
         # generer bølgekrefter
@@ -128,15 +131,18 @@ class CSAD (object):
         """
             Calculate wave load. TODO: Wave model not included.
         """
-        # update time
-        self.t = time.perf_counter()
+        if self.waveActive:
+            # update time
+            self.t = time.perf_counter()
 
-        # calculate wave loads
-        self.tau_wave = self.waveload(self.t, self.eta)
+            # calculate wave loads
+            self.tau_wave = self.waveload(self.t, self.eta)
 
-        # for debugging
-        #waveload_first = self.waveload.first_order_loads(self.t, self.eta)
-        #waveload_scnd = self.waveload.second_order_loads(self.t, self.eta[5])
+            # for debugging
+            # waveload_first = self.waveload.first_order_loads(self.t, self.eta)
+            # waveload_scnd = self.waveload.second_order_loads(self.t, self.eta[5])
+        else:
+            self.tau_wave = np.zeros(6)
 
     def updateTau(self):
         """
@@ -214,7 +220,7 @@ if __name__ == '__main__':
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
-    csad = CSAD(dt=dt)
+    csad = CSAD(dt=dt, wave=False)
 
     while not rospy.is_shutdown():
         # calculate total loads
