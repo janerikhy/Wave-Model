@@ -68,6 +68,16 @@ class Observer(object):
         # publish message
         self.pub.publish(self.observer_msg)
 
+        print(self.kalman_filter.KF_gain.shape, ' KF gain')
+        print(self.kalman_filter.Phat.shape, ' Phat')
+        print(self.kalman_filter.xhat.shape, ' xhat')
+
+        print(self.kalman_filter.xbar.shape, ' xbar')
+        print(self.kalman_filter.Ad(self.psi).shape, ' Ad ', self.kalman_filter._Bd.shape, ' Bd ', self.tau.shape, ' tau')
+        print(self.kalman_filter.Pbar.shape, ' Pbar')
+
+        print((self.kalman_filter._H@self.kalman_filter.xbar).shape)
+
 
 if __name__ == '__main__':
     vessel_name = "CSAD"
