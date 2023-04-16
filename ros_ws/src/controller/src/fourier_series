@@ -60,7 +60,7 @@ class Controller(object):
     def update(self):
         self.t += self.dt
         self.eta = np.asarray(self.eta)
-        print(self.t)
+        #print(self.t)
         self.tau = self.FS.get_tau(self.eta, self.eta_d, self.nu, self.eta_d_dot, self.eta_d_ddot, self.t, calculate_bias = False)
 
     def publishTau(self):
@@ -89,4 +89,4 @@ if __name__ == '__main__':
         r.sleep()
 
     rospy.spin()
-    rospy.shutdown()
+    # rospy.shutdown()
