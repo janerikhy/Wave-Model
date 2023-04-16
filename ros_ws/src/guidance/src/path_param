@@ -20,7 +20,7 @@ class ReferenceModel (object):
 
         # Reference model for waypoint following (surge, sway, yaw)
         self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.2, 0.02, 0.05])  # omega=[0.2, 0.05, 0.02])
+            dt=dt, omega=[0.2, 0.02, 0.5])  # omega=[0.2, 0.05, 0.02])
 
         # Waypoints
         x_start = 0.0
@@ -31,6 +31,7 @@ class ReferenceModel (object):
                        np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
                        np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list
+
         self.wpIndex = 0                            # Index of current waypoint
         # Acceptance radius for waypoint switching logic
         self.acceptanceRadius = 0.05
@@ -42,6 +43,8 @@ class ReferenceModel (object):
             f"/{vessel_name}/reference", Float64MultiArray, queue_size=1)             # Desired state publishe
         self.odom_sub = rospy.Subscriber(
             f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
+        self.wp_sub = rospy.Subscriber(
+            f"/{vessel_name}/waypoints", Float64MultiArray, self.waypointListCallback, queue_size=1)
 
         # Messages
         # Desired position and attitude message
@@ -56,9 +59,28 @@ class ReferenceModel (object):
         self.eta = msg.data[0:3]
         self.nu = msg.data[3:6]
 
+    def waypointListCallback(self, msg):
+        """
+            Waypoint list callback.
+        """
+        print("New waypoint list recieved in guidance.")
+
+        # reset waypoint list
+        self.wpList = [[0.0, 0.0, 0.0] for i in range(len(msg.data)//3)]
+
+        # update waypoint list
+        for i in range(len(msg.data)//3):
+            self.wpList[i] = np.array(
+                [msg.data[i*3], msg.data[i*3+1], msg.data[i*3+2]])
+
+        print(self.wpList)
+
+        # reset waypoint index
+        self.wpIndex = 0
+
     def publishDesiredState(self):
         """
-            Publish desired state. 
+            Publish desired state.
         """
         # update message
         self.reference_msg.data[0:3] = self.eta_d
@@ -69,14 +91,14 @@ class ReferenceModel (object):
 
     def setWaypoints(self):
         """
-            Set current waypoint.  
+            Set current waypoint.
         """
         self.wpRefModel.set_eta_r(
             self.wpList[self.wpIndex])   # [surge, sway, yaw]
 
     def updateWayPoint(self):
         """
-            Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
+            Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over.
         """
         # check if current waypoint is reached
         if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
@@ -93,7 +115,7 @@ class ReferenceModel (object):
 
     def updateDesiredPath(self):
         """
-            Update desired path. 
+            Update desired path.
         """
         # update reference model
         self.wpRefModel.update()
@@ -104,34 +126,41 @@ class ReferenceModel (object):
 
     def popWaypoint(self):
         """
-            Pop current waypoint. 
+            Pop current waypoint.
         """
         self.wpList.pop(self.wpIndex)
 
     def addWaypoint(self, waypoint):
         """
-            Add waypoint. 
+            Add waypoint.
         """
         self.wpList.append(waypoint)
 
     def clearWaypoints(self):
         """
-            Clear waypoints. 
+            Clear waypoints.
         """
         self.wpList = []
         self.wpIndex = 0
 
     def getWaypoints(self):
         """
-            Get waypoints. 
+            Get waypoints.
         """
         return self.wpList
 
     def getWaypointIndex(self):
         """
-            Get waypoint index. 
+            Get waypoint index.
         """
         return self.wpIndex
+
+    def replaceWaypointList(self, waypointList):
+        """
+            Replace waypoint.
+        """
+        self.wpList = waypointList
+        self.wpIndex = 0
 
 
 if __name__ == '__main__':
