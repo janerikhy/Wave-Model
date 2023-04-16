@@ -3,10 +3,12 @@ import rospy
 import numpy as np
 
 from MCSimPython.simulator import CSAD_DP_6DOF
+from MCSimPython.waves import WaveLoad, JONSWAP
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 
+import time
 
 class CSAD (object):
     def __init__(self, dt=0.01) -> None:
@@ -23,6 +25,41 @@ class CSAD (object):
         self.tau = np.zeros(6)              # Total loads
         self.tau_wave = np.zeros(6)         # Wave loads
         self.tau_thruster = np.zeros(6)     # Thruster loads
+
+        # Wave spectra
+        hs = 0.03    # Signifcant wave height
+        tp = 1.0    # Peak wave period
+        gamma = 3.3 # Peakedness factor of wave spectra
+
+        wp = 2*np.pi/tp
+        wmin = 0.5*wp
+        wmax = 3.0*wp
+
+        N = 100     # Number of wave components
+        wave_freqs = np.linspace(wmin, wmax, N)
+        jonswap = JONSWAP(wave_freqs)
+        _, wave_spectra = jonswap(hs=hs, tp=tp, gamma=gamma)
+
+        # Wave loads
+        dw = (wmax - wmin)/N      # Space between each frequency component
+        wave_amps = np.sqrt(2*wave_spectra*dw)   # Calculate wave amplitudes
+        rand_phase = np.random.uniform(0, 2*np.pi, size=N) # Random phase
+        wave_angles = np.ones(N)*np.pi # Waves going south
+
+        
+        self.waveload = WaveLoad(
+            wave_amps=wave_amps,
+            freqs=wave_freqs,
+            eps=rand_phase,
+            angles=wave_angles,
+            config_file=self.model._config_file,
+            interpolate=True,
+            qtf_method="geo-mean",      # Use geometric mean to approximate the QTF matrices.
+            deep_water=True # kan sette dybde her (1.4) Deep water er da false og legger til dept = 1.4
+        )
+
+        # generer bølgekrefter
+        self.t = time.perf_counter()
 
         # thruster position in BODY-frame
         self.Lx = np.array(
@@ -91,7 +128,15 @@ class CSAD (object):
         """
             Calculate wave load. TODO: Wave model not included.
         """
-        self.tau_wave = np.zeros(6)
+        # update time
+        self.t = time.perf_counter()
+
+        # calculate wave loads
+        self.tau_wave = self.waveload(self.t, self.eta)
+
+        # for debugging
+        #waveload_first = self.waveload.first_order_loads(self.t, self.eta)
+        #waveload_scnd = self.waveload.second_order_loads(self.t, self.eta[5])
 
     def updateTau(self):
         """
