@@ -28,7 +28,7 @@ class AdaptiveFSController():
         self._M = six2threeDOF(M)
         self._D = six2threeDOF(D)
         
-        self.theta_hat = np.zeros(2*N + 1)
+        self.theta_hat = np.zeros((2*N + 1)*3)
         
         # Frequencies to be used in disturbance model 
         w_min = 2*np.pi/20                          # Lower bound
@@ -36,16 +36,16 @@ class AdaptiveFSController():
         self.set_freqs(w_min, w_max, N)
 
         # Tuning:
-        self._K1 = np.diag([10., 1., .1])
-        self._K2 = np.diag([10., 1., .1])*100
-        self._gamma = np.eye(2*self._N +1) * 5
+        self._K1 = np.diag([.1, 1., .1])
+        self._K2 = np.diag([.1, 1., .1])*10
+        self._gamma = np.eye((2*self._N +1)*3) * 5
         self._kappa = 1                             # Must be positive
 
 
 
     def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_ddot, t, calculate_bias=False):
         '''
-        Calculate controller output...
+        Calculate controller output based on the adaptive update law. 
 
         Parameters
         -----------
@@ -68,9 +68,14 @@ class AdaptiveFSController():
 
         # Use get_regressor() to calculate Phi
         regressor_transpose = self.get_regressor(t)
-        Phi_transpose = np.array([regressor_transpose, regressor_transpose, regressor_transpose])
+        zeros = np.zeros(len(regressor_transpose))
+
+        Phi_transpose = np.block([[regressor_transpose, zeros, zeros], 
+                                  [zeros, regressor_transpose, zeros], 
+                                  [zeros, zeros, regressor_transpose]])
+
         Phi = Phi_transpose.T
-        
+       
         # Introduce the first new state, which shall converge towards zero
         z1 = R.T@(eta-eta_d)
         z1[-1] = pipi(z1[-1])

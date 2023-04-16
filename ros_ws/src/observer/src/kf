@@ -1,17 +1,73 @@
 #!/usr/bin/env python3
 import rospy
-
+import math
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
+from MCSimPython.observer.ltv_kf import LTVKF
+from MCSimPython.simulator.csad import CSAD_DP_6DOF
+
+import numpy as np
+
+class Observer(object):
+    def __init__(self, dt=0.01, Tp=1) -> None:
+        self.dt = dt
+        self.vessel = CSAD_DP_6DOF(dt)
+        self.kalman_filter = LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
+
+        
+        self.tau = np.zeros(3)
+        self.y = np.zeros(3)
+        self.psi = 0.0
+
+        self.pub = rospy.Publisher(
+            f"/{vessel_name}/observer_states", Float64MultiArray, queue_size=1)         # publishing estimated pos, vel, bias and wave
+        self.subTau = rospy.Subscriber(
+            f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
+        self.odom_sub = rospy.Subscriber(
+            f"/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
+        
+        self.observer_msg = Float64MultiArray()
+
+    def update(self):
+        self.kalman_filter.update(self.tau, self.y, self.psi)
 
 
-def odomCallback(msg):
-    pass
+    def odomCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.odom_msg = msg     # HVA SKJER HER?
 
+        # Quaternions
+        w = msg.pose.pose.orientation.w
+        x = msg.pose.pose.orientation.x
+        y = msg.pose.pose.orientation.y
+        z = msg.pose.pose.orientation.z
 
-def tauCallback(msg):
-    pass
+        # Position and attitude
+        self.y[0] = msg.pose.pose.position.x
+        self.y[1] = msg.pose.pose.position.y
+        self.y[2] = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)
+                                 )     # quaternion to euler
+        self.psi = self.y[2]
 
+        self.y = np.resize(self.y, (3,1))
+
+    def tauCallback(self, msg):
+        self.tau = np.resize(msg.data[:3],(3,1))
+
+    def publish(self):
+        """
+            Publishes the observer estimates.
+        """
+        # update message
+        self.observer_msg.data[0:6] = self.kalman_filter.get_x_hat()[0:6]
+        self.observer_msg.data[6:9] = self.kalman_filter.get_eta_hat()
+        self.observer_msg.data[9:12] = self.kalman_filter.get_bias()
+        self.observer_msg.data[12:15] = self.kalman_filter.get_nu_hat()
+
+        # publish message
+        self.pub.publish(self.observer_msg)
 
 if __name__ == '__main__':
     vessel_name = "CSAD"
@@ -19,20 +75,16 @@ if __name__ == '__main__':
     rospy.loginfo(f"INITIALIZING {vessel_name} KALMAN FILTERS NODE")
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
+    Tp = 1
 
-    # Subscribers
+    observer = Observer(dt, Tp)
 
-    odom_sub = rospy.Subscriber(
-        f"/qualisys/{vessel_name}/odom", Odometry, odomCallback)
-    tau_sub = rospy.Subscriber(
-        f"/{vessel_name}/tau", Float64MultiArray, tauCallback)
-
-    # Publishers
-    # observer states
-
-    # Messages
 
     while not rospy.is_shutdown():
+
+        observer.update()
+
+        observer.publish()
 
         r.sleep()
 

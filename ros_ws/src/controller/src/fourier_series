@@ -4,14 +4,71 @@ import rospy
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 from messages.msg import Observer_state, Reference
+from MCSimPython.control.adaptiveFS import AdaptiveFSController
+from MCSimPython.simulator import CSAD_DP_6DOF 
+import numpy as np
+
+vessel_name = 'CSAD'
+
+class Controller(object):
+    def __init__(self, dt=0.01) -> None:
+        # Time initialization
+        self.t = 0
+        self.dt = dt
+
+        # Vessel initialization
+        self.vessel = CSAD_DP_6DOF(dt)
+        self.FS = AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
 
 
-def refCallback(msg):
-    pass
+        self.tau = np.zeros(3)
+
+        self.eta = np.zeros(3)
+        self.nu = np.zeros(3)
+
+        self.eta_d = np.zeros(3)
+        self.eta_d_dot = np.zeros(3)
+        self.eta_d_ddot = np.zeros(3)
+        
+        # Publishers/Subscribers
+        self.odom_sub = rospy.Subscriber(
+            f"/{vessel_name}/observer_states", Float64MultiArray, self.obsCallback, queue_size=1)  # Odometry subscriber
+        # Desired state subscriber
+        self.desiredState_sub = rospy.Subscriber(
+            f"/{vessel_name}/reference", Float64MultiArray, self.refCallback, queue_size=1)
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
+
+        self.tau_msg = Float64MultiArray()
+
+    def refCallback(self, msg):
+        '''
+        Update reference states from filter
+        '''
+        self.eta_d = msg.data[0:3]
+        self.eta_d_dot = msg.data[3:6]
+        self.eta_d_ddot = msg.data[6:9]
 
 
-def obsCallback(msg):
-    pass
+    def obsCallback(self, msg):
+        '''
+        update state from observer
+        '''
+        self.eta = msg.data[6:9]
+        self.nu = msg.data[12:15]
+
+    def update(self):
+        self.t += self.dt
+        self.eta = np.asarray(self.eta)
+        print(self.t)
+        self.tau = self.FS.get_tau(self.eta, self.eta_d, self.nu, self.eta_d_dot, self.eta_d_ddot, self.t, calculate_bias = False)
+
+    def publishTau(self):
+        '''
+        Publish to thrust allocation
+        '''
+        self.tau_msg.data = self.tau
+        self.tau_pub.publish(self.tau_msg)
 
 
 if __name__ == '__main__':
@@ -19,21 +76,15 @@ if __name__ == '__main__':
     rospy.init_node(f"{vessel_name}_fourier_series_controller")
     rospy.loginfo(f"INITIALIZING {vessel_name} FOURIER SERIES CONTROLLER NODE")
     r = rospy.Rate(100)
-    dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
-    # Subscribers
-
-    reference_sub = rospy.Subscriber(
-        f"/{vessel_name}/reference", Reference, refCallback)
-    obs_sub = rospy.Subscriber(
-        f"/{vessel_name}/observer_states", Observer_state, obsCallback)
-
-    # Publishers
-    tauCmd_pub = rospy.Publisher(
-        f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)
-    # Messages
+    # Initialize controller
+    controller = Controller(dt = 0.01)
 
     while not rospy.is_shutdown():
+        # Update according to control law
+        controller.update()
+        # Publish tau_cmd
+        controller.publishTau()
 
         r.sleep()
 

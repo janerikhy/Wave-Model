@@ -4,7 +4,7 @@
 # This code is part of the MCSimPython toolbox and repository.
 # Created By: Jan-Erik Hygen
 # Created Date: 2023-01-30
-# Revised: 
+# Revised: 2023-02 - Added Direct Bias Compensation Controller - Harald Mo
 # Tested:
 # 
 # Copyright (C) 2023: NTNU, Trondheim
@@ -102,6 +102,20 @@ class DirectBiasCompensationController():
         self.Kd = np.diag(kd)
 
     def get_tau(self, eta, eta_d, nu, nu_d, b):
+        '''
+        Parameters
+        ----------
+        eta : array_like
+            Vessel pose in surge, sway and yaw.
+        eta_d : array_like
+            Desired vessel pose in surge, sway and yaw (NED-frame).
+        nu : array_like
+            Vessel velocity in surge, sway, and yaw (body-frame).
+        nu_d : array_like
+            Desired vessel velocity in surge, sway and yaw (body-frame).
+        b : array_like
+            Estimated bias in surge, sway and yaw (body-frame)
+        '''
         psi = eta[-1]
         z1 = Rz(psi).T@(eta-eta_d)              # P
         z2 = nu - nu_d                          # D
