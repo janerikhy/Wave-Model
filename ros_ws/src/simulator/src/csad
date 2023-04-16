@@ -220,7 +220,7 @@ if __name__ == '__main__':
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
 
-    csad = CSAD(dt=dt, wave=False)
+    csad = CSAD(dt=dt, waveActive=False)
 
     while not rospy.is_shutdown():
         # calculate total loads
