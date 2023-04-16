@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
 b = bagreader('test_before_easter.bag')
 
 
@@ -24,6 +25,15 @@ for t in b.topics:
 df_alpha = pd.read_csv(csvfiles[0])
 # 15-dimensional. Represents observer states [eta, nu, bias, xi]
 df_obs = pd.read_csv(csvfiles[1])
+# 6-dimensional
+df_ref = pd.read_csv(csvfiles[2])
+# 6-
+df_tau_cmd = pd.read_csv(csvfiles[3])
+#
+df_u = pd.read_csv(csvfiles[4])
+#
+
+print(df_tau_cmd)
 
 
 def plot_alpha():
