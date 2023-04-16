@@ -8,13 +8,13 @@ from MCSimPython.simulator.csad import CSAD_DP_6DOF
 
 import numpy as np
 
+
 class Observer(object):
     def __init__(self, dt=0.01, Tp=1) -> None:
         self.dt = dt
         self.vessel = CSAD_DP_6DOF(dt)
         self.kalman_filter = LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
 
-        
         self.tau = np.zeros(3)
         self.y = np.zeros(3)
         self.psi = 0.0
@@ -25,12 +25,11 @@ class Observer(object):
             f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
         self.odom_sub = rospy.Subscriber(
             f"/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
-        
+
         self.observer_msg = Float64MultiArray()
 
     def update(self):
         self.kalman_filter.update(self.tau, self.y, self.psi)
-
 
     def odomCallback(self, msg):
         """
@@ -48,13 +47,13 @@ class Observer(object):
         self.y[0] = msg.pose.pose.position.x
         self.y[1] = msg.pose.pose.position.y
         self.y[2] = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)
-                                 )     # quaternion to euler
+                               )     # quaternion to euler
         self.psi = self.y[2]
 
-        self.y = np.resize(self.y, (3,1))
+        self.y = np.resize(self.y, (3, 1))
 
     def tauCallback(self, msg):
-        self.tau = np.resize(msg.data[:3],(3,1))
+        self.tau = np.resize(msg.data[:3], (3, 1))
 
     def publish(self):
         """
@@ -69,6 +68,7 @@ class Observer(object):
         # publish message
         self.pub.publish(self.observer_msg)
 
+
 if __name__ == '__main__':
     vessel_name = "CSAD"
     rospy.init_node(f"{vessel_name}_kf")
@@ -79,7 +79,6 @@ if __name__ == '__main__':
 
     observer = Observer(dt, Tp)
 
-
     while not rospy.is_shutdown():
 
         observer.update()
@@ -89,4 +88,3 @@ if __name__ == '__main__':
         r.sleep()
 
     rospy.spin()
-    # rospy.shutdown()
