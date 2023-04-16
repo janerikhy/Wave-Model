@@ -32,8 +32,8 @@ df_tau_cmd = pd.read_csv(csvfiles[3])
 #
 df_u = pd.read_csv(csvfiles[4])
 #
-
-print(df_tau_cmd)
+df_pose = pd.read_csv(csvfiles[8])
+print(df_pose)
 
 
 def plot_alpha():
