@@ -106,8 +106,7 @@ class Mission (object):
         else:
             print("Invalid mission. Abborting current mission.")
             self.wpList = np.array([])
-        print(math.atan2(self.wpList[1+3] -
-              self.eta[1], self.wpList[0+3] - self.eta[0]))
+
         # Second wp turns vessel towards the correct point
         second_wp = np.array([self.eta[0], self.eta[1], math.atan2(
             self.wpList[1+3] - self.eta[1], self.wpList[0+3] - self.eta[0])])

@@ -140,7 +140,7 @@ class CSAD (object):
             Update pos and attitude.
         """
 
-        self.model.integrate(self.Uc, self.beta_c, csad.tau)
+        self.model.integrate(self.Uc, self.beta_c, self.tau)
 
         # pose with noise
         self.eta = self.model.get_eta() + np.random.normal(0, 0.001, 6)
