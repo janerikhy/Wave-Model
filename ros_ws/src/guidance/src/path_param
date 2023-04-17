@@ -20,10 +20,10 @@ class ReferenceModel (object):
 
         # Reference model for waypoint following (surge, sway, yaw)
         self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.2, 0.02, 0.5])  # omega=[0.2, 0.05, 0.02])
+            dt=dt, omega=[0.3, 0.01, 0.002])  # omega=[0.2, 0.05, 0.02])
 
         # Waypoints
-        x_start = 0.0
+        x_start = 3.0
         y_start = 0.0
 
         self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
@@ -37,6 +37,8 @@ class ReferenceModel (object):
         self.acceptanceRadius = 0.05
         # Heading threshold for waypoint switching logic
         self.headingThreshold = 0.5*np.pi/180.0
+
+        self.setpoint = True # remove later
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -58,6 +60,11 @@ class ReferenceModel (object):
         # update state
         self.eta = msg.data[0:3]
         self.nu = msg.data[3:6]
+
+        if self.setpoint and self.eta[0] != 0.0:
+            self.wpList = [np.array(self.eta)]
+            self.setpoint = False
+            print(f"SetPoint set to: (x, y, yaw): ({round(self.wpList[0][0], 3)}, {round(self.wpList[0][1],3)}, {round(self.wpList[0][2]*180/np.pi,3)}) ")
 
     def waypointListCallback(self, msg):
         """
@@ -174,7 +181,7 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         # check if current waypoint is reached
-        referenceModel.updateWayPoint()
+        #referenceModel.updateWayPoint()
 
         # set waypoint
         referenceModel.setWaypoints()
