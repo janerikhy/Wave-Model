@@ -204,6 +204,59 @@ class CSAD_DP_6DOF(Vessel):
         self._D = self._Dv + self._Dp
 
 
+class CSAD_DP_Seakeeping(Vessel):
+    
+    def __init__(self, dt, method="RK4", config_file='vessel_json.json', vessel_abc='vesselABC_json.json'):
+        config_file = os.path.join(DATA_DIR, config_file)
+        config_abc_file = os.path.join(DATA_DIR, vessel_abc)
+        super().__init__(dt, config_file=config_file, method=method, dof=6)
+        with open(config_abc_file, 'r') as f:
+            vesselABC = json.load(f)
+        with open(config_file, 'r') as f:
+            vessel_data = json.load(f)
+        
+        self.Mrb = np.asarray(vesselABC['MRB'])
+        self.Ma = np.asarray(vesselABC['MA'])
+        self.Minv = np.linalg.inv(self.Ma + self.Mrb)
+        self.D = np.asarray(vessel_data['Bv'])
+        self.G = np.asarray(vesselABC['G'])
+
+    def x_dot(self, x, Uc, betac, tau):
+        eta = x[:self._dof]
+        nu = x[self._dof:]
+
+        nu_cn = Uc*np.array([np.cos(betac), np.sin(betac), 0])
+
+        nu_c = Rz(eta[-1]).T@nu_cn
+        nu_c = np.insert(nu_c, [3, 3, 3], 0)
+        nu_r = nu - nu_c
+        eta_dot = J(eta)@nu
+
+        nu_dot = self.Minv@(tau - self.D@nu_r - self.G@eta)
+        return np.concatenate([eta_dot, nu_dot])
+
+
+# class CSAD_DP_Seakeeping(Vessel):
+
+#     def __init__(self, dt, metod="RK4", config_file="vessel_json.json", vessel_abc="vesselABC_json.json", **kwargs):
+#         with open(os.path.join(DATA_DIR, config_file)) as f:
+#             vessel = json.load(f)
+#         with open(os.path.join(DATA_DIR, vessel_abc)) as ff:
+#             vesselABC = json.load(ff)
+#         super().__init__(dt=dt, config_file=config_file, dof=6)
+#         self._Mrb = np.asarray(vesselABC['MRB'])
+#         self._Ma = np.asarray(vesselABC['MA'])
+#         self._M = self._Mrb + self._Ma
+#         self._Minv = np.linalg.inv(self._M)
+
+#         self._Dp = np.asarray(vessel['B'])[:, :, -1]
+#         self._Dv = np.asarray(vessel['Bv'])
+#         self._D = self._Dp + self._Dv
+
+#         self._G = np.asarray(vessel['C'])[:, :, 0]
+
+        
+
 # class CSAD6DOF(Vessel):
 #     """
 #     6 DOF stationkeeping model. Unified seakeeping and maneuvering model
