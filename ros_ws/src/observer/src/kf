@@ -5,8 +5,14 @@ from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 from MCSimPython.observer.ltv_kf import LTVKF
 from MCSimPython.simulator.csad import CSAD_DP_6DOF
-
+from MCSimPython.utils import pipi
 import numpy as np
+
+
+#import sys
+#sys.path.append(r'/home/mc-lab/Wave-Model')
+
+#import src.MCSimPython.observer.ltv_kf as ltv
 
 
 class Observer(object):
@@ -14,7 +20,17 @@ class Observer(object):
         self.dt = dt
         self.vessel = CSAD_DP_6DOF(dt)
         self.kalman_filter = LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
-
+        self.kalman_filter.set_tuning_matrices(np.array([
+                [1e4,0,0,0,0,0],
+                [0,1e4,0,0,0,0],
+                [0,0,1*np.pi/180,0,0,0],
+                [0,0,0,1e3,0,0],
+                [0,0,0,0,1e3,0],
+                [0,0,0,0,0,1e1]]), np.array([
+                [1e-1,0,0],
+                [0,1e-1,0],
+                [0,0,1e-0*np.pi/180]
+        ]) )
         self.tau = np.zeros(3)
         self.y = np.zeros(3)
         self.psi = 0.0
@@ -24,7 +40,7 @@ class Observer(object):
         self.subTau = rospy.Subscriber(
             f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
         self.odom_sub = rospy.Subscriber(
-            f"/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
+            f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
 
         self.observer_msg = Float64MultiArray()
 
@@ -35,25 +51,31 @@ class Observer(object):
         """
             Callback function for odometry message. Updating position and attitude of vessel.
         """
-        self.odom_msg = msg     # HVA SKJER HER?
+        self.odom_msg = msg
 
-        # Quaternions
-        w = msg.pose.pose.orientation.w
-        x = msg.pose.pose.orientation.x
-        y = msg.pose.pose.orientation.y
-        z = msg.pose.pose.orientation.z
+        # Position
+        eta_x = msg.pose.pose.position.x
+        eta_y = msg.pose.pose.position.y
+        eta_z = msg.pose.pose.position.z
 
-        # Position and attitude
-        self.y[0] = msg.pose.pose.position.x
-        self.y[1] = msg.pose.pose.position.y
-        self.y[2] = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z)
-                               )     # quaternion to euler
-        self.psi = self.y[2]
+        # Quaternions (attitude)
+        q_w = msg.pose.pose.orientation.w
+        q_x = msg.pose.pose.orientation.x
+        q_y = msg.pose.pose.orientation.y
+        q_z = msg.pose.pose.orientation.z
 
+        self.psi = np.arctan2(2*(q_w*q_z + q_x*q_y), 1 - 2*(q_y*q_y + q_z*q_z))     # quaternion to euler
+        
+        # Test
+        #self.psi = pipi(np.deg2rad(msg.pose.pose.orientation.yaw_deg))
+        
+        # Save as y
+        self.y = np.array([eta_x, eta_y, self.psi])
         self.y = np.resize(self.y, (3, 1))
 
+
     def tauCallback(self, msg):
-        self.tau = np.resize(msg.data[:3], (3, 1))
+        self.tau = np.resize(msg.data[:3], (3,))
 
     def publish(self):
         """
@@ -67,17 +89,7 @@ class Observer(object):
 
         # publish message
         self.pub.publish(self.observer_msg)
-
-        print(self.kalman_filter.KF_gain.shape, ' KF gain')
-        print(self.kalman_filter.Phat.shape, ' Phat')
-        print(self.kalman_filter.xhat.shape, ' xhat')
-
-        print(self.kalman_filter.xbar.shape, ' xbar')
-        print(self.kalman_filter.Ad(self.psi).shape, ' Ad ', self.kalman_filter._Bd.shape, ' Bd ', self.tau.shape, ' tau')
-        print(self.kalman_filter.Pbar.shape, ' Pbar')
-
-        print((self.kalman_filter._H@self.kalman_filter.xbar).shape)
-
+        
 
 if __name__ == '__main__':
     vessel_name = "CSAD"
@@ -85,7 +97,7 @@ if __name__ == '__main__':
     rospy.loginfo(f"INITIALIZING {vessel_name} KALMAN FILTERS NODE")
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
-    Tp = 1
+    Tp = 1e4
 
     observer = Observer(dt, Tp)
 
