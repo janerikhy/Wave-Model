@@ -1,7 +1,4 @@
 <launch>
     <node name="simulator" pkg = "simulator" type="csad" output="screen" />
     <node name="observer" pkg = "observer" type="smallGain" output="screen"/>
-    <node name="controller" pkg = "controller" type="pid"  output="screen"/>
-    <node name="thrust_allocator" pkg = "thrust_allocator" type="pseudo_inv" output="screen" />
-    <node name="guidance" pkg = "guidance" type="path_param" output="screen" />
 </launch>

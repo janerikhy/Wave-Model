@@ -8,26 +8,42 @@ vessel_name = "CSAD"
 
 class ThrustAlloc(object):
     def __init__(self) -> None:
-        self.u = np.zeros(6)
-        self.alpha = np.zeros(6)
+        self.counter = 0.0
+        self.u = np.zeros(4)
+        self.alpha = np.zeros(4)
         self.tau = np.zeros(6)
-
+        """
         # x position of thruster in body frame
         self.Lx = np.array(
             [1.0678, 0.9344, 0.9344, -1.1644, -0.9911, -0.9911])
         # y position of thruster in body frame
         self.Ly = np.array([0.0, 0.11, -0.11, 0.0, -0.1644, 0.1644])
         self.K = np.array([0.3763, 0.3901, 0.3776, 0.5641,
-                          0.4799, 0.5588])  # Thrust koefficient
+                           0.4799, 0.5588])  # Thrust koefficient
 
-        # Exended thrust koefficient
-        self.K_ext = np.diag([self.K[0], self.K[0], self.K[1], self.K[1], self.K[2],
-                             self.K[2], self.K[3], self.K[3], self.K[4], self.K[4], self.K[5], self.K[5]])
-        # Exended configuration matrix
+                # Exended configuration matrix
         self.T_ext = np.array([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
                                [0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
                                    0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
                                [-self.Ly[0], self.Lx[0], -self.Ly[1], self.Lx[1], -self.Ly[2], self.Lx[2], -self.Ly[3], self.Lx[3], -self.Ly[4], self.Lx[4], -self.Ly[5], self.Lx[5]]])
+        """
+        self.Lx = np.array(
+            [1.0678, 0.9344, -1.1644, -0.9911])
+        # y position of thruster in body frame
+        self.Ly = np.array([0.0, 0.11, 0.0, 0.1644])
+        self.K = np.array([0.3763, 0.3901, 0.5641, 0.5588]
+                          )  # Thrust koefficient
+        self.K = np.array([0.45, 0.45, 0.46, 0.46])
+
+        # Exended thrust koefficient
+        self.K_ext = np.diag([self.K[0], self.K[0], self.K[1], self.K[1], self.K[2],
+                             self.K[2], self.K[3], self.K[3]])
+
+        # Exended configuration matrix
+        self.T_ext = np.array([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                               [0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+                                   0.0, 1.0],
+                               [-self.Ly[0], self.Lx[0], -self.Ly[1], self.Lx[1], -self.Ly[2], self.Lx[2], -self.Ly[3], self.Lx[3]]])
 
         # Invers the configuration and koefficient matrices
         self.K_extInv = np.linalg.inv(self.K_ext)
@@ -79,12 +95,9 @@ class ThrustAlloc(object):
             Publish command forces to tau topic.
         """
 
-        # u = np.array([self.u[0], self.u[1], self.u[2], self.u[3], self.u[4], self.u[5],
-        #              self.alpha[0], self.alpha[1], self.alpha[2], self.alpha[3], self.alpha[4], self.alpha[5]])
-        # u = np.resize(u, (len(u), 1))
-
         # update message
-        self.u_msg.data = self.u
+        self.u_msg.data = np.array([self.u[0], self.u[1], 0.0, self.u[2], 0.0, self.u[3],
+                                   self.alpha[0], self.alpha[1], 0.0, self.alpha[2], 0.0, self.alpha[3]])
         self.alpha_msg.data = self.alpha
 
         # publish messsage
@@ -94,8 +107,8 @@ class ThrustAlloc(object):
 
 
 if __name__ == '__main__':
-    rospy.init_node("thrust_allocator")
-    rospy.loginfo(f"INITIALIZING {vessel_name} THRUSTER ALLOCATION NODE")
+    rospy.init_node("thrust_alloc")
+    rospy.loginfo("INITIALIZING THRUSTER ALLOCATION NODE")
     r = rospy.Rate(100)
 
     thrustAlloc = ThrustAlloc()
@@ -103,6 +116,8 @@ if __name__ == '__main__':
         f"/CSAD/tau_cmd", Float64MultiArray, thrustAlloc.callback, queue_size=1)
 
     while not rospy.is_shutdown():
+        thrustAlloc.publish()
         r.sleep()
 
     rospy.spin()
+    rospy.shutdown()
