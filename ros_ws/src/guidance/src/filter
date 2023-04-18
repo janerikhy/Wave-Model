@@ -22,20 +22,24 @@ class ReferenceModel (object):
 
         # Reference model for waypoint following (surge, sway, yaw)
         self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.2, 0.02, 0.05])  # omega=[0.2, 0.05, 0.02])
+            dt=dt, omega=[0.1, 0.01, 0.025])  # omega=[0.2, 0.05, 0.02])
 
         # Waypoints
+        self.local_time = 50
+        self.switch = 100
 
-        x_start = 0.0
-        y_start = 0.0
+        x_start = 1.6
+        y_start = 0.8
 
-        self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
+        '''self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
-                       np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list
+                       np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list'''
         self.wpIndex = 0                                                    # Index of current waypoint
-
+        self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]), 
+                       np.array([1.0 + x_start, 0.0 + y_start, 0.0])]
+        
         # Acceptance radius for waypoint switching logic
         self.acceptanceRadius = 0.05
         # Heading threshold for waypoint switching logic
@@ -81,8 +85,13 @@ class ReferenceModel (object):
         # check if current waypoint is reached
         if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
                 (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
+            self.local_time += self.dt
+        #else:
+        #    self.local_time = 0.0
 
+        if self.local_time > self.switch:
             self.wpIndex += 1
+            self.local_time = 0
 
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
