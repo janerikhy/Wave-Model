@@ -23,8 +23,8 @@ class ReferenceModel (object):
             dt=dt, omega=[0.2, 0.02, 0.5])  # omega=[0.2, 0.05, 0.02])
 
         # Waypoints
-        x_start = 0.0
-        y_start = 0.0
+        x_start = 0.30
+        y_start = 0.20
 
         self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
@@ -37,6 +37,8 @@ class ReferenceModel (object):
         self.acceptanceRadius = 0.05
         # Heading threshold for waypoint switching logic
         self.headingThreshold = 0.5*np.pi/180.0
+
+        self.stationkeeping = True
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -59,6 +61,16 @@ class ReferenceModel (object):
         self.eta = msg.data[0:3]
         self.nu = msg.data[3:6]
 
+        if self.stationkeeping:
+            self.wpList = [np.array((self.eta[0], self.eta[1], self.eta[2])),
+                           np.array((self.eta[0] + 1, self.eta[1] + 1, 0.0))]
+            self.stationkeeping = False
+            print("Surge mode activated. Maintaining:\n"
+                  f"x: {round(self.eta[0], 2)}, y: {round(self.eta[1], 2)}, yaw: {round(self.eta[2], 2)}")
+            self.wpIndex = 0
+
+        print(round(np.linalg.norm(self.eta - self.wpList[self.wpIndex]), 3))
+
     def waypointListCallback(self, msg):
         """
             Waypoint list callback.
@@ -72,8 +84,6 @@ class ReferenceModel (object):
         for i in range(len(msg.data)//3):
             self.wpList[i] = np.array(
                 [msg.data[i*3], msg.data[i*3+1], msg.data[i*3+2]])
-
-        print(self.wpList)
 
         # reset waypoint index
         self.wpIndex = 0
@@ -174,7 +184,7 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         # check if current waypoint is reached
-        referenceModel.updateWayPoint()
+        # referenceModel.updateWayPoint()
 
         # set waypoint
         referenceModel.setWaypoints()
