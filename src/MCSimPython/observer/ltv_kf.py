@@ -134,9 +134,7 @@ class LTVKF():
         if asynchronous:
             self.update_async(tau, y, psi_m)
             return None
-        
-        y = np.reshape(y, (3,))
-        tau = np.reshape(tau, (3,))
+
 
         # Correct
         self.corrector(y)
@@ -151,7 +149,9 @@ class LTVKF():
     
     def predictor(self, tau, psi_m):
         Ad =  self.Ad(psi_m)   # Get the time-varying state matrix
-    
+
+        tau = tau.reshape((3,)) # ROS check
+
         self.xbar = Ad@self.xhat + self._Bd@tau
         self.Pbar = Ad@self.Phat@Ad.T + self._Ed@self.Qd@self._Ed.T
 
@@ -163,9 +163,11 @@ class LTVKF():
         else:
             K = self.KF_gain
 
+            y = y.reshape((3,)) # ROS check
             prediction_error = y - (self._H@self.xbar)
             prediction_error[2] = pipi(prediction_error[2])   # Smallest signed angle modification
 
+            
             parenthesis = np.eye(15) - K @ self._H
 
             self.Phat = parenthesis @ self.Pbar @ parenthesis.T + K @ self.Rd @ K.T

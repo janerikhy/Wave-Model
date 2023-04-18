@@ -123,6 +123,8 @@ class CSAD (object):
                           np.sin(self.alpha),
                            self.Lx*np.sin(self.alpha) - self.Ly*np.cos(self.alpha)])
         tau = (self.B@self.K)@self.u
+        # saturation
+        #tau = np.clip(tau, -5, 5)
 
         self.tau_thruster = np.array(
             [tau[0], tau[1], 0, 0, 0, tau[2]])
@@ -185,6 +187,7 @@ class CSAD (object):
         self.odom_msg.twist.twist.angular.x = self.nu[3]
         self.odom_msg.twist.twist.angular.y = self.nu[4]
         self.odom_msg.twist.twist.angular.z = self.nu[5]
+
 
     def updateState(self):
         """

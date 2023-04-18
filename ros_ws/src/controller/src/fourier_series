@@ -3,7 +3,6 @@ import rospy
 
 from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
-from messages.msg import Observer_state, Reference
 from MCSimPython.control.adaptiveFS import AdaptiveFSController
 from MCSimPython.simulator import CSAD_DP_6DOF 
 import numpy as np
@@ -56,11 +55,14 @@ class Controller(object):
         '''
         self.eta = msg.data[6:9]
         self.nu = msg.data[12:15]
+        
+        #self.eta, self.nu = np.asarray(self.eta), np.asarray(self.nu)
+        
 
     def update(self):
         self.t += self.dt
         self.eta = np.asarray(self.eta)
-        #print(self.t)
+        # print(self.t)
         self.tau = self.FS.get_tau(self.eta, self.eta_d, self.nu, self.eta_d_dot, self.eta_d_ddot, self.t, calculate_bias = False)
 
     def publishTau(self):
@@ -89,4 +91,3 @@ if __name__ == '__main__':
         r.sleep()
 
     rospy.spin()
-    # rospy.shutdown()
