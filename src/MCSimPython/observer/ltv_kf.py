@@ -134,6 +134,8 @@ class LTVKF():
         if asynchronous:
             self.update_async(tau, y, psi_m)
             return None
+        
+        y, tau = np.asarray(y), np.asarray(tau)
 
 
         # Correct
@@ -164,6 +166,8 @@ class LTVKF():
             K = self.KF_gain
 
             y = y.reshape((3,)) # ROS check
+            self.xbar =self.xbar.reshape((3,))
+
             prediction_error = y - (self._H@self.xbar)
             prediction_error[2] = pipi(prediction_error[2])   # Smallest signed angle modification
 
