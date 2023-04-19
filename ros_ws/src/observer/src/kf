@@ -21,15 +21,15 @@ class Observer(object):
         self.vessel = CSAD_DP_6DOF(dt)
         self.kalman_filter = LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
         self.kalman_filter.set_tuning_matrices(np.array([
-                [1e4,0,0,0,0,0],
-                [0,1e4,0,0,0,0],
+                [1e3,0,0,0,0,0],
+                [0,1e3,0,0,0,0],
                 [0,0,1*np.pi/180,0,0,0],
-                [0,0,0,1e3,0,0],
-                [0,0,0,0,1e3,0],
-                [0,0,0,0,0,1e1]]), np.array([
-                [1e-1,0,0],
-                [0,1e-1,0],
-                [0,0,1e-0*np.pi/180]
+                [0,0,0,5e5,0,0],
+                [0,0,0,0,5e5,0],
+                [0,0,0,0,0,1e2]]), np.array([
+                [1e2,0,0],
+                [0,1e2,0],
+                [0,0,1e3*np.pi/180]
         ]) )
         self.tau = np.zeros(3)
         self.y = np.zeros(3)
