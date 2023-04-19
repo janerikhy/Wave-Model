@@ -27,6 +27,14 @@ class Observer(object):
         self.M_inv = np.linalg.inv(self.M)  # Inertia matrix inverse
 
         # Injection gains
+        pso = [150., 100., 7e5, 2e5,   1e5, 1e5]
+        pso = [7., 10., 4, 0.1,   0.1, 0.1]
+        L1 = np.diag((pso[0], pso[0], pso[1]))
+        L2 = np.diag((pso[2], pso[2], pso[3]))
+        L3 = np.diag((pso[4], pso[4], pso[5]))
+        L4 = np.concatenate((np.diag((0.0, 0.0, 0.0)),
+                            np.diag((0.0, 0.0, 0.0))), axis=0)
+
         self.L1 = L1  # pos gain
         self.L2 = L2  # vel gain
         self.L3 = L3  # bias gain

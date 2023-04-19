@@ -24,7 +24,7 @@ class ReferenceModel (object):
 
         # Waypoints
 
-        x_start = 3.0
+        x_start = 0.0
         y_start = 0.0
 
         self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
@@ -39,7 +39,7 @@ class ReferenceModel (object):
         # Heading threshold for waypoint switching logic
         self.headingThreshold = 0.5*np.pi/180.0
 
-        self.stationkeeping = True
+        self.stationkeeping = False
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -70,7 +70,7 @@ class ReferenceModel (object):
                   f"x: {round(self.eta[0], 2)}, y: {round(self.eta[1], 2)}, yaw: {round(self.eta[2], 2)}")
             self.wpIndex = 0
 
-        print(round(np.linalg.norm(self.eta - self.wpList[self.wpIndex]), 3))
+        # print(round(np.linalg.norm(self.eta - self.wpList[self.wpIndex]), 3))
 
     def waypointListCallback(self, msg):
         """
@@ -185,7 +185,7 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         # check if current waypoint is reached
-        # referenceModel.updateWayPoint()
+        referenceModel.updateWayPoint()
 
         # set waypoint
         referenceModel.setWaypoints()
