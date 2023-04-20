@@ -4,7 +4,7 @@ import numpy as np
 from MCSimPython.simulator.thruster_dynamics import ThrusterDynamics
 from std_msgs.msg import Float64MultiArray
 vessel_name = "CSAD"
-
+from MCSimPython.utils import Rx
 
 class ThrustAlloc(object):
     def __init__(self) -> None:
@@ -77,6 +77,9 @@ class ThrustAlloc(object):
             Allocate the forces to be  produced by each thruster, and publish the command forces to the u topic.
         """
         self.tau = msg.data
+        
+        # Rotate*
+        self.tau = Rx(np.pi)@self.tau
 
         # Calculating decomposed power for each thruster
         self.u_ext = np.matmul(
@@ -94,12 +97,19 @@ class ThrustAlloc(object):
 
         # Publish command forces
         self.publish()
+
     def calculate_tau_ctrl(self):
+        # Saturate control signal
         self.u = np.clip(self.u, -.5, .5)
 
+        # Calculate actual (estimated) tau from thrusters
         actuator_loads = np.diag(self.K) @ self.u
         self.tau = self.thruster_configuration(self.alpha) @ actuator_loads
+
+        # Store in topic, rotate*
         self.tau = np.asarray(self.tau)
+        self.tau = Rx(np.pi)@self.tau
+
         self.tau_msg.data = self.tau
 
         
@@ -134,16 +144,20 @@ class ThrustAlloc(object):
         # update message
         self.calculate_tau_ctrl()
 
-        # 6 Thrusters
+
+        # If 6 Thrusters
         #self.u_msg.data = np.array([self.u[0], self.u[1], self.u[2], self.u[3], self.u[4], self.u[5],
         #                           self.alpha[0], self.alpha[1], self.alpha[2], self.alpha[3], self.alpha[4], self.alpha[5]])
-        # 4 Thrusters
+        
+        # If 4 Thrusters
         self.u_msg.data = np.array([self.u[0], self.u[1], 0.0, self.u[2], 0.0, self.u[3],
                                    self.alpha[0], self.alpha[1], 0.0, self.alpha[2], 0.0, self.alpha[3]])
-        # Custom test
+        
+        # If custom test
         #self.u_msg.data = np.array([0., 0., self.u[2] , 0. , self.u[4] , 0.0, 
         #                            0., self.alpha[2], 0.0, 0.0,self.alpha[4], 0.0])
         
+
         self.alpha_msg.data = self.alpha
 
         # publish messsage
