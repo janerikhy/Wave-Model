@@ -57,6 +57,7 @@ class LTVKF():
         self._Minv = np.linalg.inv(M)
         self._D = six2threeDOF(D)
 
+        self.deadReck = False
 
         # Initial values
         self.xhat = np.zeros(15)
@@ -112,7 +113,7 @@ class LTVKF():
         self._Bd[12:15, 0:3] = self._Minv * self._dt
 
         self._Ed = np.zeros((15,6))
-        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt, np.eye(3)*self._dt
+        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt*.01, np.eye(3)*self._dt   # Multipliy with .01
 
         self._H = np.zeros((3,15))
         self._H[0:3,3:6], self._H[0:3,6:9] = np.eye(3), np.eye(3)
@@ -135,7 +136,7 @@ class LTVKF():
             self.update_async(tau, y, psi_m)
             return None
         
-        y, tau = np.asarray(y), np.asarray(tau)
+        y, tau = np.asarray(y), np.asarray(tau) # ROS check
 
 
         # Correct
@@ -162,11 +163,10 @@ class LTVKF():
         if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
             self.Phat = self.Pbar
             self.xhat = self.xbar
+            self.deadReck = True
         else:
             K = self.KF_gain
-
             y = y.reshape((3,)) # ROS check
-            self.xbar =self.xbar.reshape((3,))
 
             prediction_error = y - (self._H@self.xbar)
             prediction_error[2] = pipi(prediction_error[2])   # Smallest signed angle modification
@@ -205,7 +205,7 @@ class LTVKF():
               0_(3x6)   0_(3x3)     0_(3x3)         0_(3x3)     \n
               0_(3x6)   0_(3x3)     M_inv*R(t).T    -M_inv*D ]
         and 
-        Ad = e^(dt*A)   OR   Ad = I + dt * A
+        Ad = I + dt * A
         '''
         A = np.block([
             [self._Aw,          np.zeros((6,3)),    np.zeros((6,3)),      np.zeros((6,3))],
