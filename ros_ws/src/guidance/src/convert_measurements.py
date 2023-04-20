@@ -50,7 +50,7 @@ class Measurements(object):
         q_z = msg.pose.pose.orientation.z
 
         euler_angles = quat2eul(q_w, q_x, q_y, q_z)
-        eta_psi = pipi(euler_angles[0])                    # Edited to work with Qualisys
+        eta_psi = (euler_angles[0])                    # Edited to work with Qualisys
 
         # Velocity
         nu_x = msg.twist.twist.linear.x
