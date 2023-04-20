@@ -7,6 +7,10 @@ from MCSimPython.control.adaptiveFS import AdaptiveFSController
 from MCSimPython.simulator import CSAD_DP_6DOF 
 import numpy as np
 
+import sys
+sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+import src.MCSimPython.control.adaptiveFS as adap
+
 vessel_name = 'CSAD'
 
 class Controller(object):
@@ -17,8 +21,7 @@ class Controller(object):
 
         # Vessel initialization
         self.vessel = CSAD_DP_6DOF(dt)
-        self.FS = AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
-
+        self.FS = adap.AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
 
         self.tau = np.zeros(3)
 
@@ -53,8 +56,8 @@ class Controller(object):
         '''
         update state from observer
         '''
-        self.eta = msg.data[6:9]
-        self.nu = msg.data[12:15]
+        self.eta = msg.data[0:3]
+        self.nu = msg.data[3:6]
         
         #self.eta, self.nu = np.asarray(self.eta), np.asarray(self.nu)
         
