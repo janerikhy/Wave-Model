@@ -24,15 +24,15 @@ class Observer(object):
         # Initilize filter
         self.kalman_filter = ltv.LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
         self.kalman_filter.set_tuning_matrices(np.array([
-                [1e-1,0,0,0,0,0],
-                [0,1e-6,0,0,0,0],
+                [1e-2,0,0,0,0,0],
+                [0,1e-2,0,0,0,0],
                 [0,0,1e-4*np.pi/180,0,0,0],
-                [0,0,0,5e3,0,0],
-                [0,0,0,0,5e3,0],
+                [0,0,0,5e1,0,0],
+                [0,0,0,0,5e2,0],
                 [0,0,0,0,0,1e2]]), np.array([
-                [1e-3,0,0],
-                [0,1e-4,0],
-                [0,0,1e-4*np.pi/180]
+                [5e-5,0,0],
+                [0,5e-5,0],
+                [0,0,1e-3*np.pi/180]
         ]) )
         self.tau, self.y, self.y_prev = np.zeros(3), np.zeros(3), np.ones(3)
 
