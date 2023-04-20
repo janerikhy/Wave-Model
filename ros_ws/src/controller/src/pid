@@ -12,8 +12,8 @@ vessel_name = "CSAD"
 
 class Controller (object):
     def __init__(self, dt=0.01) -> None:
-        self.kp = np.array([10., 10., 20.])*0.1  # Proportional gain
-        self.kd = np.array([100.5, 100.5, 200.])*0.001  # Derivative gain
+        self.kp = np.array([10., 10., 20.])  # Proportional gain
+        self.kd = np.array([1.5, 1.5, 2.])  # Derivative gain
         self.ki = np.array([.3, .3, .4])*0.1  # Integral gain
 
         self.pid = PID(kp=self.kp, kd=self.kd,
@@ -32,11 +32,18 @@ class Controller (object):
         # Desired state subscriber
         self.desiredState_sub = rospy.Subscriber(
             f"/{vessel_name}/reference", Float64MultiArray, self.referenceCallback, queue_size=1)
+        self.gains_sub = rospy.Subscriber(
+            f"/{vessel_name}/pid_gains", Float64MultiArray, self.gainsCallback, queue_size=1)
         self.tau_pub = rospy.Publisher(
             f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
 
         # Messages
         self.tau_msg = Float64MultiArray()  # command forces [surge, sway, yaw]
+
+    def gainsCallback(self, msg):
+        self.pid.set_kp([msg.data[0], msg.data[1], msg.data[2]])
+        self.pid.set_ki([msg.data[3], msg.data[4], msg.data[5]])
+        self.pid.set_kd([msg.data[6], msg.data[7], msg.data[8]])
 
     def observerCallback(self, msg):
         """
