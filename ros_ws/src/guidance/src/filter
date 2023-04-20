@@ -6,6 +6,11 @@ from MCSimPython.guidance.filter import ThrdOrderRefFilter
 
 from std_msgs.msg import Float64MultiArray
 
+import sys
+sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+import src.MCSimPython.guidance.filter as f
+
+
 vessel_name = "CSAD"
 
 
@@ -15,21 +20,25 @@ class ReferenceModel (object):
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
-        self.eta_d = np.zeros(3)        # Pose, attitude [surge, sway, yaw]
+        x_start = 4.3
+        y_start = 0.6
+        psi_start = np.deg2rad(73.)
+
+        self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
         self.eta_d_ddot = np.zeros(3)   # Acceleration
         
 
         # Reference model for waypoint following (surge, sway, yaw)
-        self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.1, 0.01, 0.025])  # omega=[0.2, 0.05, 0.02])
+        self.wpRefModel = f.ThrdOrderRefFilter(
+            dt=dt, omega=[0.9, 0.9, 0.025])  # omega=[0.2, 0.05, 0.02])
+        self.wpRefModel.eta_d = self.eta_d
 
         # Waypoints
         self.local_time = 50
         self.switch = 100
 
-        x_start = 1.6
-        y_start = 0.8
+        
 
         '''self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
@@ -61,8 +70,8 @@ class ReferenceModel (object):
             Observer callback.
         """
         # update state
-        self.eta = msg.data[6:9]
-        self.nu = msg.data[12:15]
+        self.eta = msg.data[0:3]
+        self.nu = msg.data[3:6]
 
     def publishDesiredState(self):
         """
@@ -113,10 +122,9 @@ if __name__ == '__main__':
     referenceModel = ReferenceModel(dt=dt)
 
     while not rospy.is_shutdown():
-
         # check if current waypoint is reached
         referenceModel.updateWayPoint()
-        
+
         # set waypoint
         referenceModel.wpRefModel.set_eta_r(referenceModel.wpList[referenceModel.wpIndex])
 
@@ -127,6 +135,7 @@ if __name__ == '__main__':
         referenceModel.eta_d = referenceModel.wpRefModel.get_eta_d()
         referenceModel.eta_d_dot = referenceModel.wpRefModel.get_eta_d_dot()
         referenceModel.eta_d_ddot = referenceModel.wpRefModel.get_eta_d_ddot()
+        
 
         # publish desired state
         referenceModel.publishDesiredState()
@@ -134,4 +143,3 @@ if __name__ == '__main__':
         r.sleep()
 
     rospy.spin()
-    # rospy.shutdown()
