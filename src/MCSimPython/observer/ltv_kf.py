@@ -57,7 +57,6 @@ class LTVKF():
         self._Minv = np.linalg.inv(M)
         self._D = six2threeDOF(D)
 
-        self.deadReck = False
 
         # Initial values
         self.xhat = np.zeros(15)
@@ -119,7 +118,7 @@ class LTVKF():
         self._H[0:3,3:6], self._H[0:3,6:9] = np.eye(3), np.eye(3)
 
 
-    def update(self, tau, y, psi_m, asynchronous = False):
+    def update(self, tau, y, psi_m, asynchronous = False, dead_reckoning = False):
         '''
         Update:
         Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
@@ -140,7 +139,7 @@ class LTVKF():
 
 
         # Correct
-        self.corrector(y)
+        self.corrector(y, dead_reckoning)
         # Predict        
         self.predictor(tau, psi_m)
     
@@ -159,11 +158,10 @@ class LTVKF():
         self.Pbar = Ad@self.Phat@Ad.T + self._Ed@self.Qd@self._Ed.T
 
     
-    def corrector(self, y):
-        if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
+    def corrector(self, y, dead_reckoning):
+        if dead_reckoning:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
             self.Phat = self.Pbar
             self.xhat = self.xbar
-            self.deadReck = True
         else:
             K = self.KF_gain
             y = y.reshape((3,)) # ROS check
