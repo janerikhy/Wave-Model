@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
+from datetime import datetime
 
-
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Bool, Int64
 from nav_msgs.msg import Odometry
+
 from MCSimPython.utils import Rx, pipi, Rz
 
 import sys
@@ -26,6 +27,13 @@ class Measurements(object):
         self.pub = rospy.Publisher(f"/{vessel_name}/measurements", Float64MultiArray, queue_size=1)
         self.measurements_msg = Float64MultiArray()
 
+        self.pub_dead_reckoning = rospy.Publisher(f"/{vessel_name}/dead_reck", Int64, queue_size=1)
+        self.dead_reck_msg = Int64()
+
+        # Initialize check for no signal received
+        self.dr_check = 0
+        self.last_msg_time = datetime.now()
+
     def rotate(self):
         '''
         Rotate from global basin frame to global NED and local body frame.
@@ -37,6 +45,8 @@ class Measurements(object):
         """
             Callback function for odometry message. Updating position and attitude of vessel.
         """
+        self.last_msg_time = datetime.now()
+
         self.odom_msg = msg
 
         # Position
@@ -62,11 +72,25 @@ class Measurements(object):
 
         self.rotate()
 
+    def check_message_time(self):
+        time_diff = datetime.now() - self.last_msg_time
+        if time_diff.total_seconds() >= 1.0:
+            rospy.logwarn('No odom message received for 1 second')
+            self.dr_check = 1
+        elif self.dr_check:
+            self.dr_check = 0
+        
+
+
     def publish(self):
         self.measurements_msg.data[0:3] = self.eta
         self.measurements_msg.data[3:6] = self.nu
 
+        self.dead_reck_msg.data = 1 if self.dr_check else 0
+
         self.pub.publish(self.measurements_msg)
+        self.pub_dead_reckoning.publish(self.dead_reck_msg)
+        
 
 if __name__ == '__main__':
     vessel_name = "CSAD"
@@ -78,6 +102,8 @@ if __name__ == '__main__':
     y = Measurements()
     
     while not rospy.is_shutdown():
+        y.check_message_time()
+        
         # Publish message
         y.publish()
 
