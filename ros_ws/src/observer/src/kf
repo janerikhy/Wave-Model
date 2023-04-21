@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 import math
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Bool, Int64
 from nav_msgs.msg import Odometry
 from MCSimPython.observer.ltv_kf import LTVKF
 from MCSimPython.simulator.csad import CSAD_DP_6DOF
@@ -30,7 +30,7 @@ class Observer(object):
                 [0,0,0,5e1,0,0],
                 [0,0,0,0,5e2,0],
                 [0,0,0,0,0,1e2]]), np.array([
-                [5e-5,0,0],
+                [5e-4,0,0],
                 [0,5e-5,0],
                 [0,0,1e-3*np.pi/180]
         ]) )
@@ -38,6 +38,7 @@ class Observer(object):
 
         self.psi = 0.0
 
+        self.dead_reckoning = False
         
 
         # Publishers and subscribers
@@ -49,6 +50,8 @@ class Observer(object):
         #    f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
         self.odom2_sub = rospy.Subscriber(
             f"/{vessel_name}/measurements", Float64MultiArray, self.odom2Callback, queue_size=1)
+        self.dead_reck_sub = rospy.Subscriber(
+            f"/{vessel_name}/measurements", Int64, self.dead_reckCallback, queue_size=1)
         
         self.observer_msg = Float64MultiArray()
 
@@ -65,16 +68,32 @@ class Observer(object):
         #    self.kalman_filter.deadReck = True
 
         # Update
-        self.kalman_filter.update(self.tau, self.y, self.y[-1])
+        self.kalman_filter.update(self.tau, self.y, self.y[-1], dead_reckoning = False)
+
+        if self.dead_reckoning:
+            rospy.logwarn('Dead reck activated')
 
     def odom2Callback(self, msg):
+        # Check timestamp on received topic
+
         self.odom_2msg = msg
 
         eta = msg.data[0:3]
         nu = msg.data[3:6]
-
+        
         self.y = eta
         self.y = np.resize(self.y, (3,))
+
+
+    def dead_reckCallback(self, msg):
+        #self.dead_reck_msg = msg
+
+        #self.dead_reckoning = True if msg.data == True else False
+        if  msg.data[0]:
+            self.dead_reckoning = True
+        elif not msg.data[0]:
+            self.dead_reckoning = False
+
     '''
     def odomCallback(self, msg):
         """
@@ -147,13 +166,8 @@ if __name__ == '__main__':
     observer = Observer(dt, Tp)
 
     while not rospy.is_shutdown():
-
         # Update
         observer.update()
-
-        # Check for dead reck
-        if observer.kalman_filter.deadReck:
-            print('Dead reckoning activated')
         
         # Publish message
         observer.publish()
