@@ -20,9 +20,9 @@ class ReferenceModel (object):
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
-        x_start = 4.3
-        y_start = 0.6
-        psi_start = np.deg2rad(73.)
+        x_start = 3.9
+        y_start = -0.2
+        psi_start = np.deg2rad(45)
 
         self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
@@ -30,29 +30,48 @@ class ReferenceModel (object):
         
 
         # Reference model for waypoint following (surge, sway, yaw)
-        self.wpRefModel = f.ThrdOrderRefFilter(
-            dt=dt, omega=[0.9, 0.9, 0.025])  # omega=[0.2, 0.05, 0.02])
+        self.wpRefModel = f.ThrdOrderRefFilter(dt=dt, omega=[0.04, 0.04, 0.03])       # omega=[0.2, 0.05, 0.02])
+        
         self.wpRefModel.eta_d = self.eta_d
+        self.wpRefModel._x = np.concatenate([self.eta_d, self.eta_d_dot, self.eta_d_ddot], axis=None)
+
 
         # Waypoints
-        self.local_time = 50
-        self.switch = 100
+        self.local_time = 0
+        self.switch = 50
 
-        
+        self.test = 'surgeswayyaw'
+        self.wpIndex = 0 
 
-        '''self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
-                       np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list'''
-        self.wpIndex = 0                                                    # Index of current waypoint
-        self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]), 
-                       np.array([1.0 + x_start, 0.0 + y_start, 0.0])]
+        if self.test == '4corner':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
+                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
+                        np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
+                        np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
+                        np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]
+        elif self.test == 'surge':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([1.0 + x_start, 0.0 + y_start, 0.0 + psi_start])]
+        elif self.test == 'sway':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([0.0 + x_start, 1.0 + y_start, 0.0 + psi_start])]
+        elif self.test == 'yaw':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([0.0 + x_start, 0.0 + y_start, np.pi/4 + psi_start])]
+        elif self.test == 'surgesway':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([-1.0 + x_start, 0.0 + y_start, psi_start])]
+        elif self.test == 'surgeswayyaw':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([0.0 + x_start, -1.0 + y_start, -np.pi/4 + psi_start])]
+        else:
+            self.wpList == [np.array([0.0, 0.0, 0.0])]
+            rospy.logwarn('Unable to understand mission')
         
         # Acceptance radius for waypoint switching logic
-        self.acceptanceRadius = 0.05
+        self.acceptanceRadius = 0.1
         # Heading threshold for waypoint switching logic
-        self.headingThreshold = 0.5*np.pi/180.0
+        self.headingThreshold = np.deg2rad(2.5)
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -61,9 +80,8 @@ class ReferenceModel (object):
             f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
 
         # Messages
-        # Desired position and attitude message
         self.reference_msg = Float64MultiArray()        # desired state message
-        self.observer_msg = Float64MultiArray()    # Odometry message
+        self.observer_msg = Float64MultiArray()         # Odometry message
 
     def observerCallback(self, msg):
         """
@@ -92,11 +110,14 @@ class ReferenceModel (object):
             Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
         """
         # check if current waypoint is reached
-        if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
-                (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
+        if ((np.linalg.norm(self.eta[0:2] - self.wpList[self.wpIndex][0:2]) < self.acceptanceRadius) and
+                (np.abs(self.eta[2] - self.wpList[self.wpIndex][2]) < self.headingThreshold)):
             self.local_time += self.dt
-        #else:
-        #    self.local_time = 0.0
+            rospy.loginfo('Vessel within setpoint. \t Time: ' + str(round(self.local_time, 3)))
+
+
+        else:
+            self.local_time = 0.0
 
         if self.local_time > self.switch:
             self.wpIndex += 1
@@ -105,9 +126,9 @@ class ReferenceModel (object):
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
                 self.wpIndex = 0
-
-            print("waypoint:", self.wpList[self.wpIndex])
-            print("index:", self.wpIndex)
+            rospy.loginfo("Waypoint: " + str(self.wpList[self.wpIndex]))
+            rospy.loginfo("Index: " + str(self.wpIndex))
+    
 
     
 
