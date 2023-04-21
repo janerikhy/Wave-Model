@@ -14,6 +14,7 @@
 
 import numpy as np
 from time import time
+from scipy.signal import welch
 
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
@@ -358,3 +359,32 @@ def rigid_body_transform(r, eta, in_ned=True):
         eta = np.copy(np.linalg.inv(J(eta))@eta)
         print(eta)
     return eta[:3] + np.cross(eta[3:], r)
+
+
+def power_spectral_density(timeseries, fs, freq_hz=False, nperseg=2**11):
+    """Compute the Power Spectral Density (PSD) of a timeseries.
+    
+    The PSD is calculated using scipy.signals.welch
+
+    Parameters
+    ----------
+    timerseries : array_like
+        Timeseries array.
+    fs : int
+        Sampling frequency
+    freq_hz : bool (optional)
+        Calculate the PSD in [hz]. Defaults to False.
+    nperseg : float (optional)
+        Number of points per segments used in the scipy.signal.welch function.
+    
+    Returns
+    -------
+    f : array_like
+        Frequencies in PSD. Returned as [rad/s] if freq_hz=False.
+    PSD : array_like
+        PSD of timeseries. Returned as [unit/(rad/s)] if freq_hz=False
+    """
+    f, S_f = welch(timeseries, fs=fs, nperseg=nperseg)
+    if not freq_hz:
+        return f*2*np.pi, S_f/(2*np.pi)
+    return f, S_f
