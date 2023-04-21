@@ -32,7 +32,7 @@ class ThrdOrderRefFilter():
         self.eta_d_dot = np.zeros(3)
         self.eta_d_ddot = np.zeros(3)
         self._eta_r = np.zeros(3)
-        self._x = np.zeros(9)
+        self._x = np.concatenate([self.eta_d, self.eta_d_dot, self.eta_d_ddot], axis=None)
         self._delta = np.eye(3)
         self._w = np.diag(omega)
         O3x3 = np.zeros((3, 3))
