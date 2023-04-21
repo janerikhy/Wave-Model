@@ -16,5 +16,5 @@ Examples
 >>> from MCSimPython.waves import JONSWAP, WaveLoad
 """
 
-from MCSimPython.waves.wave_loads import WaveLoad
+from MCSimPython.waves.wave_loads import WaveLoad, FluidMemory
 from MCSimPython.waves.wave_spectra import JONSWAP, ModifiedPiersonMoskowitz
