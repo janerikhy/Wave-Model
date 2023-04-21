@@ -11,7 +11,7 @@ class ThrustAlloc(object):
         self.counter = 0.0
         self.u = np.zeros(4)
         self.alpha = np.zeros(4)
-        self.tau = np.zeros(6)
+        self.tau, self.tau_cmd = np.zeros(6), np.zeros(6)
         '''
         # 6 Thrusters
         # x position of thruster in body frame
@@ -76,14 +76,20 @@ class ThrustAlloc(object):
         """
             Allocate the forces to be  produced by each thruster, and publish the command forces to the u topic.
         """
-        self.tau = msg.data
-        
+        self.tau_cmd = msg.data
+
         # Rotate*
-        self.tau = Rx(np.pi)@self.tau
+        self.tau_cmd = Rx(np.pi)@self.tau_cmd
+
+        # Amplify small values of tau
+        for i in range(len(self.tau_cmd)):
+            tau_cmd_i = np.abs(self.tau_cmd[i])
+            if tau_cmd_i > 0.005 and tau_cmd_i < 0.08:
+                self.tau_cmd[i] = 0.08 * np.sign(self.tau_cmd[i])
 
         # Calculating decomposed power for each thruster
         self.u_ext = np.matmul(
-            np.matmul(self.K_extInv, self.T_extInv), self.tau)
+            np.matmul(self.K_extInv, self.T_extInv), self.tau_cmd)
 
         # Calculate individual thruster force
         for i in range(len(self.u)):
@@ -94,13 +100,19 @@ class ThrustAlloc(object):
         for i in range(len(self.alpha)):
             self.alpha[i] = self.ssa(np.math.atan2(
                 self.u_ext[2*i+1], self.u_ext[2*i]))
-
-        # Publish command forces
-        self.publish()
+        
 
     def calculate_tau_ctrl(self):
         # Saturate control signal
         self.u = np.clip(self.u, -.5, .5)
+
+        # Amplify small values of u
+        for i in range(len(self.u)):
+            u_i = np.abs(self.u[i])
+            if u_i > 0.02 and u_i < 0.108:
+                self.u[i] = 0.108 * np.sign(self.u[i])
+            elif u_i <= 0.02:
+                self.u[i] = 0.0
 
         # Calculate actual (estimated) tau from thrusters
         actuator_loads = np.diag(self.K) @ self.u
@@ -112,7 +124,6 @@ class ThrustAlloc(object):
 
         self.tau_msg.data = self.tau
 
-        
         
     def thruster_configuration(self, alpha):
 
@@ -154,8 +165,8 @@ class ThrustAlloc(object):
                                    self.alpha[0], self.alpha[1], 0.0, self.alpha[2], 0.0, self.alpha[3]])
         
         # If custom test
-        #self.u_msg.data = np.array([0., 0., self.u[2] , 0. , self.u[4] , 0.0, 
-        #                            0., self.alpha[2], 0.0, 0.0,self.alpha[4], 0.0])
+        #self.u_msg.data = np.array([self.u[0], 0., 0.0 , 0. , 0.0 , 0.0, 
+        #                            0., 0.0 , 0.0, 0.0,0.0, 0.0])
         
 
         self.alpha_msg.data = self.alpha
@@ -178,6 +189,8 @@ if __name__ == '__main__':
 
     while not rospy.is_shutdown():
         thrustAlloc.publish()
+
+
         r.sleep()
 
     rospy.spin()
