@@ -217,8 +217,16 @@ class CSAD_DP_Seakeeping(Vessel):
         
         self.Mrb = np.asarray(vesselABC['MRB'])
         self.Ma = np.asarray(vesselABC['MA'])
+        # Check if altering the different added mass term can better improve response
+        # self.Ma[2, 2] = 235.0
+        # self.Ma[2, 4] = 18.0
+        # self.Ma[4, 4] = 115.0
+        # self.Ma[3, 5] = self.Ma[3, 5]*0.1
+        # self.Ma[3, 1] = self.Ma[3, 1]
+
         self.Minv = np.linalg.inv(self.Ma + self.Mrb)
         self.D = np.asarray(vessel_data['Bv'])
+        # self.D[3,3] = 0.0
         self.G = np.asarray(vesselABC['G'])
 
     def x_dot(self, x, Uc, betac, tau):
