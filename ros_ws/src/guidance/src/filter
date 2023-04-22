@@ -20,9 +20,9 @@ class ReferenceModel (object):
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
-        x_start = 3.9
-        y_start = -0.2
-        psi_start = np.deg2rad(45)
+        x_start = 3.1
+        y_start = -0.3
+        psi_start = np.deg2rad(0)
 
         self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
@@ -30,7 +30,7 @@ class ReferenceModel (object):
         
 
         # Reference model for waypoint following (surge, sway, yaw)
-        self.wpRefModel = f.ThrdOrderRefFilter(dt=dt, omega=[0.04, 0.04, 0.03])       # omega=[0.2, 0.05, 0.02])
+        self.wpRefModel = f.ThrdOrderRefFilter(dt=dt, omega=[0.038, 0.038, 0.03])       # omega=[0.2, 0.05, 0.02])
         
         self.wpRefModel.eta_d = self.eta_d
         self.wpRefModel._x = np.concatenate([self.eta_d, self.eta_d_dot, self.eta_d_ddot], axis=None)
@@ -38,17 +38,18 @@ class ReferenceModel (object):
 
         # Waypoints
         self.local_time = 0
-        self.switch = 50
+        self.switch = 75
+        self.i = 0                  # Iterator in print sentence
 
-        self.test = 'surgeswayyaw'
+        self.test = '4corner'
         self.wpIndex = 0 
 
         if self.test == '4corner':
-            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
-                        np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
-                        np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
-                        np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
-                        np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0+ psi_start]),
+                        np.array([1.5 + x_start, 0.0 + y_start, 0.0 + psi_start]),
+                        np.array([1.5 + x_start, 1.5 + y_start, 0.0 + psi_start]),
+                        np.array([1.5 + x_start, 1.5 + y_start, np.pi/4 + psi_start]),
+                        np.array([0.0 + x_start, 1.5 + y_start, np.pi/4 + psi_start])]
         elif self.test == 'surge':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
                            np.array([1.0 + x_start, 0.0 + y_start, 0.0 + psi_start])]
@@ -109,11 +110,14 @@ class ReferenceModel (object):
         """
             Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
         """
+        self.i += 1
+
         # check if current waypoint is reached
         if ((np.linalg.norm(self.eta[0:2] - self.wpList[self.wpIndex][0:2]) < self.acceptanceRadius) and
-                (np.abs(self.eta[2] - self.wpList[self.wpIndex][2]) < self.headingThreshold)):
+                (np.abs(self.eta[2] - self.wpList[self.wpIndex][2]) < self.headingThreshold) and np.allclose(self.eta_d[0:2], self.wpList[self.wpIndex][0:2], atol=0.01, rtol=0.0)):
             self.local_time += self.dt
-            rospy.loginfo('Vessel within setpoint. \t Time: ' + str(round(self.local_time, 3)))
+            if self.i % 100 == 0:
+                rospy.loginfo('Vessel within setpoint. \t Time: ' + str(round(self.local_time, 0)))
 
 
         else:
@@ -122,6 +126,7 @@ class ReferenceModel (object):
         if self.local_time > self.switch:
             self.wpIndex += 1
             self.local_time = 0
+            
 
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
