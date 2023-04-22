@@ -154,7 +154,7 @@ if __name__ == '__main__':
     rospy.loginfo(f"INITIALIZING {vessel_name} KALMAN FILTERS NODE")
     r = rospy.Rate(100)
     dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
-    Tp = 1e7
+    Tp = 0.7 # sea state 1           # 1e7
 
     # Initilize ros node
     observer = Observer(dt, Tp)

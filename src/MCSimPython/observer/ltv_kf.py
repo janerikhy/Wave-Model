@@ -112,7 +112,7 @@ class LTVKF():
         self._Bd[12:15, 0:3] = self._Minv * self._dt
 
         self._Ed = np.zeros((15,6))
-        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt*.01, np.eye(3)*self._dt   # Multipliy with .01
+        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt, np.eye(3)*self._dt   # Multipliy with .01
 
         self._H = np.zeros((3,15))
         self._H[0:3,3:6], self._H[0:3,6:9] = np.eye(3), np.eye(3)
