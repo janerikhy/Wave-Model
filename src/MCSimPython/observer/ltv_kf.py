@@ -145,7 +145,7 @@ class LTVKF():
     
 
     def update_async(self, tau, y, psi_m):
-        return NotImplementedError
+        raise NotImplementedError
     
         
     
