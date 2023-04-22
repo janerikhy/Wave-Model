@@ -20,9 +20,9 @@ class ReferenceModel (object):
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
-        x_start = 5.0
-        y_start = 0.5
-        psi_start = np.deg2rad(45)
+        x_start = 3.5
+        y_start = -0.3
+        psi_start = np.deg2rad(0)
 
         self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
@@ -41,15 +41,15 @@ class ReferenceModel (object):
         self.switch = 75
         self.i = 0                  # Iterator in print sentence
 
-        self.test = 'surgesway'
+        self.test = 'stationkeeping'
         self.wpIndex = 0 
 
         if self.test == '4corner':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0+ psi_start]),
-                        np.array([1.5 + x_start, 0.0 + y_start, 0.0 + psi_start]),
-                        np.array([1.5 + x_start, 1.5 + y_start, 0.0 + psi_start]),
-                        np.array([1.5 + x_start, 1.5 + y_start, np.pi/4 + psi_start]),
-                        np.array([0.0 + x_start, 1.5 + y_start, np.pi/4 + psi_start])]
+                        np.array([1.0 + x_start, 0.0 + y_start, 0.0 + psi_start]),
+                        np.array([1.0 + x_start, 1.0 + y_start, 0.0 + psi_start]),
+                        np.array([1.0 + x_start, 1.0 + y_start, np.pi/4 + psi_start]),
+                        np.array([0.0 + x_start, 1.0 + y_start, np.pi/4 + psi_start])]
         elif self.test == 'surge':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
                            np.array([1.0 + x_start, 0.0 + y_start, 0.0 + psi_start])]
@@ -65,6 +65,9 @@ class ReferenceModel (object):
         elif self.test == 'surgeswayyaw':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
                            np.array([0.0 + x_start, -1.0 + y_start, -np.pi/4 + psi_start])]
+        elif self.test == 'stationkeeping':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([0.0 + x_start, 0.0 + y_start, psi_start])]
         else:
             self.wpList == [np.array([0.0, 0.0, 0.0])]
             rospy.logwarn('Unable to understand mission')
