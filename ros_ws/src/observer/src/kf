@@ -51,7 +51,7 @@ class Observer(object):
         self.odom2_sub = rospy.Subscriber(
             f"/{vessel_name}/measurements", Float64MultiArray, self.odom2Callback, queue_size=1)
         self.dead_reck_sub = rospy.Subscriber(
-            f"/{vessel_name}/measurements", Int64, self.dead_reckCallback, queue_size=1)
+            f"/{vessel_name}/dead_reck", Bool, self.dead_reckCallback, queue_size=1)
         
         self.observer_msg = Float64MultiArray()
 
@@ -68,10 +68,10 @@ class Observer(object):
         #    self.kalman_filter.deadReck = True
 
         # Update
-        self.kalman_filter.update(self.tau, self.y, self.y[-1], dead_reckoning = False)
-
+        self.kalman_filter.update(self.tau, self.y, self.y[-1], dead_reckoning = self.dead_reckoning)
         if self.dead_reckoning:
-            rospy.logwarn('Dead reck activated')
+            rospy.logwarn('Dead reckoning activated')
+
 
     def odom2Callback(self, msg):
         # Check timestamp on received topic
@@ -85,14 +85,8 @@ class Observer(object):
         self.y = np.resize(self.y, (3,))
 
 
-    def dead_reckCallback(self, msg):
-        #self.dead_reck_msg = msg
-
-        #self.dead_reckoning = True if msg.data == True else False
-        if  msg.data[0]:
-            self.dead_reckoning = True
-        elif not msg.data[0]:
-            self.dead_reckoning = False
+    def dead_reckCallback(self, msg2):
+        self.dead_reckoning = True if msg2.data == True else False
 
     '''
     def odomCallback(self, msg):

@@ -27,8 +27,8 @@ class Measurements(object):
         self.pub = rospy.Publisher(f"/{vessel_name}/measurements", Float64MultiArray, queue_size=1)
         self.measurements_msg = Float64MultiArray()
 
-        self.pub_dead_reckoning = rospy.Publisher(f"/{vessel_name}/dead_reck", Int64, queue_size=1)
-        self.dead_reck_msg = Int64()
+        self.pub_dead_reckoning = rospy.Publisher(f"/{vessel_name}/dead_reck", Bool, queue_size=1)
+        self.dead_reck_msg = Bool()
 
         # Initialize check for no signal received
         self.dr_check = 0
@@ -86,7 +86,7 @@ class Measurements(object):
         self.measurements_msg.data[0:3] = self.eta
         self.measurements_msg.data[3:6] = self.nu
 
-        self.dead_reck_msg.data = 1 if self.dr_check else 0
+        self.dead_reck_msg.data = True if self.dr_check else False
 
         self.pub.publish(self.measurements_msg)
         self.pub_dead_reckoning.publish(self.dead_reck_msg)
