@@ -96,7 +96,7 @@ class ThrustAlloc(object):
         for i in range(len(self.u)):
             self.u[i] = np.math.sqrt(
                 self.u_ext[i*2]**2 + self.u_ext[i*2+1]**2)
-            #self.u[i] += 0.10       # Thruster bias
+            self.u[i] += 0.10       # Thruster bias
 
         # Calculate individual thruster angle
         for i in range(len(self.alpha)):
