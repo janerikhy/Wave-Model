@@ -38,6 +38,6 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "ResponsePrediction.__version__"}
+version = {attr = "MCSimPython.__version__"}
 
 [tool.setuptools.package-data]
