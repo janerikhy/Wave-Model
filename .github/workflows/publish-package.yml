@@ -48,7 +48,7 @@ jobs:
           echo "Current repo version is: $VERSION"
           filename="$SRC_ROOT_PATH/__init__.py"
           search_pattern="__version__ = \"0.0.1\""
-          replacement_text="__version__ = \"${VERSION:2}\""
+          replacement_text="__version__ = \"${VERSION:1}\""
           echo "$replacement_text"
           sed -i "s/$search_pattern/$replacement_text/" "$filename"
     - name: Build package
