@@ -12,9 +12,9 @@ vessel_name = "CSAD"
 
 class Controller (object):
     def __init__(self, dt=0.01) -> None:
-        self.kp = np.array([10., 10., 20.])  # Proportional gain
-        self.kd = np.array([1.5, 1.5, 2.])  # Derivative gain
-        self.ki = np.array([.3, .3, .4])*0.1  # Integral gain
+        self.kp = np.array([25.0, 25.0, 5.0])*0.05  # Proportional gain
+        self.kd = np.array([14, 15, 2.])*2.0  # Derivative gain
+        self.ki = np.array([10, 5, .4])*0.005   # Integral gain
 
         self.pid = PID(kp=self.kp, kd=self.kd,
                        ki=self.ki, dt=dt)  # gains from MCSimPython package

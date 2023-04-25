@@ -6,6 +6,11 @@ from MCSimPython.guidance.filter import ThrdOrderRefFilter
 
 from std_msgs.msg import Float64MultiArray
 
+import sys
+sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+import src.MCSimPython.guidance.filter as f
+
+
 vessel_name = "CSAD"
 
 
@@ -15,35 +20,62 @@ class ReferenceModel (object):
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
 
-        self.eta_d = np.zeros(3)        # Pose, attitude [surge, sway, yaw]
+        x_start = 3.4
+        y_start = -0.5
+        psi_start = np.deg2rad(0)
+
+        self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
         self.eta_d_ddot = np.zeros(3)   # Acceleration
         
 
         # Reference model for waypoint following (surge, sway, yaw)
-        self.wpRefModel = ThrdOrderRefFilter(
-            dt=dt, omega=[0.1, 0.01, 0.025])  # omega=[0.2, 0.05, 0.02])
+        self.wpRefModel = f.ThrdOrderRefFilter(dt=dt, omega=[0.015, 0.015, 0.03])       # omega=[0.2, 0.05, 0.02])
+        
+        self.wpRefModel.eta_d = self.eta_d
+        self.wpRefModel._x = np.concatenate([self.eta_d, self.eta_d_dot, self.eta_d_ddot], axis=None)
+
 
         # Waypoints
-        self.local_time = 50
+        self.local_time = 0
         self.switch = 100
+        self.i = 0                  # Iterator in print sentence
 
-        x_start = 1.6
-        y_start = 0.8
+        self.test = 'surge'
+        self.wpIndex = 0  
 
-        '''self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 0.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 1.0 + y_start, 0.0]),
-                       np.array([1.0 + x_start, 1.0 + y_start, np.pi/4]),
-                       np.array([0.0 + x_start, 1.0 + y_start, np.pi/4])]   # Waypoints list'''
-        self.wpIndex = 0                                                    # Index of current waypoint
-        self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0]), 
-                       np.array([1.0 + x_start, 0.0 + y_start, 0.0])]
+        if self.test == '4corner':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0+ psi_start]),
+                        np.array([1.5 + x_start, 0.0 + y_start, 0.0 + psi_start]),
+                        np.array([1.5 + x_start, 1.5 + y_start, 0.0 + psi_start]),
+                        np.array([1.5 + x_start, 1.5 + y_start, np.pi/4 + psi_start]),
+                        np.array([0.0 + x_start, 1.5 + y_start, np.pi/4 + psi_start])]
+        elif self.test == 'surge':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([1.0 + x_start, 0.0 + y_start, 0.0 + psi_start])]
+        elif self.test == 'sway':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([0.0 + x_start, 1.0 + y_start, 0.0 + psi_start])]
+        elif self.test == 'yaw':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
+                           np.array([0.0 + x_start, 0.0 + y_start, np.pi/4 + psi_start])]
+        elif self.test == 'surgesway':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([-1.0 + x_start, 0.0 + y_start, psi_start])]
+        elif self.test == 'surgeswayyaw':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([0.0 + x_start, -1.0 + y_start, -np.pi/4 + psi_start])]
+        elif self.test == 'stationkeeping':
+            self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
+                           np.array([0.0 + x_start, 0.0 + y_start, psi_start])]
+        else:
+            self.wpList == [np.array([0.0, 0.0, 0.0])]
+            rospy.logwarn('Unable to understand mission')
         
         # Acceptance radius for waypoint switching logic
-        self.acceptanceRadius = 0.05
+        self.acceptanceRadius = 0.1
         # Heading threshold for waypoint switching logic
-        self.headingThreshold = 0.5*np.pi/180.0
+        self.headingThreshold = np.deg2rad(2.5)
 
         # Subscribers/Publishers
         self.desiredState_pub = rospy.Publisher(
@@ -52,17 +84,16 @@ class ReferenceModel (object):
             f"/{vessel_name}/observer_states", Float64MultiArray, self.observerCallback, queue_size=1)  # Odometry subscriber
 
         # Messages
-        # Desired position and attitude message
         self.reference_msg = Float64MultiArray()        # desired state message
-        self.observer_msg = Float64MultiArray()    # Odometry message
+        self.observer_msg = Float64MultiArray()         # Odometry message
 
     def observerCallback(self, msg):
         """
             Observer callback.
         """
         # update state
-        self.eta = msg.data[6:9]
-        self.nu = msg.data[12:15]
+        self.eta = msg.data[0:3]
+        self.nu = msg.data[3:6]
 
     def publishDesiredState(self):
         """
@@ -82,23 +113,29 @@ class ReferenceModel (object):
         """
             Check if waypoint is reached. If so, update waypoint index. If the last waypoint is reached, start over. 
         """
+        self.i += 1
+
         # check if current waypoint is reached
-        if ((np.linalg.norm(self.eta - self.wpList[self.wpIndex]) < self.acceptanceRadius) and
-                (self.eta[2] - self.wpList[self.wpIndex][2] < self.headingThreshold)):
+        if ((np.linalg.norm(self.eta[0:2] - self.wpList[self.wpIndex][0:2]) < self.acceptanceRadius) and
+                (np.abs(self.eta[2] - self.wpList[self.wpIndex][2]) < self.headingThreshold) and np.allclose(self.eta_d[0:2], self.wpList[self.wpIndex][0:2], atol=0.01, rtol=0.0)):
             self.local_time += self.dt
-        #else:
-        #    self.local_time = 0.0
+            if self.i % 100 == 0:
+                rospy.loginfo('Vessel within setpoint. \t Time: ' + str(round(self.local_time, 0)))
+
+        else:
+            self.local_time = 0.0
 
         if self.local_time > self.switch:
             self.wpIndex += 1
             self.local_time = 0
+            
 
             # if last waypoint is reached, start over
             if self.wpIndex >= len(self.wpList):
                 self.wpIndex = 0
-
-            print("waypoint:", self.wpList[self.wpIndex])
-            print("index:", self.wpIndex)
+            rospy.loginfo("Waypoint: " + str(self.wpList[self.wpIndex]))
+            rospy.loginfo("Index: " + str(self.wpIndex))
+    
 
     
 
@@ -113,10 +150,9 @@ if __name__ == '__main__':
     referenceModel = ReferenceModel(dt=dt)
 
     while not rospy.is_shutdown():
-
         # check if current waypoint is reached
         referenceModel.updateWayPoint()
-        
+
         # set waypoint
         referenceModel.wpRefModel.set_eta_r(referenceModel.wpList[referenceModel.wpIndex])
 
@@ -127,6 +163,7 @@ if __name__ == '__main__':
         referenceModel.eta_d = referenceModel.wpRefModel.get_eta_d()
         referenceModel.eta_d_dot = referenceModel.wpRefModel.get_eta_d_dot()
         referenceModel.eta_d_ddot = referenceModel.wpRefModel.get_eta_d_ddot()
+        
 
         # publish desired state
         referenceModel.publishDesiredState()
@@ -134,4 +171,3 @@ if __name__ == '__main__':
         r.sleep()
 
     rospy.spin()
-    # rospy.shutdown()

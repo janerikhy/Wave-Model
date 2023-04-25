@@ -1,0 +1,7 @@
+<launch>
+    <node name="thrust_alloc" pkg = "thrust_allocator" type="pseudo_inv" output="screen"/>
+    <node name="joystick" pkg = "controller" type="joystick" output="screen"/>
+    <node name="measurements" pkg = "guidance" type="convert_measurements.py" output="screen"/>
+    <node name="observer" pkg = "observer" type="kf" output="screen"/>
+    <node name="reference" pkg = "guidance" type="filter" output="screen"/>
+</launch>
