@@ -522,6 +522,79 @@ def read_tf(file_path, tf_type="motion"):
     return freqs, headings, velocities, rao_complex, rao_amp, rao_phase
 
 
+def read_hydrod(filepath):
+    f = open("input.re7", 'r')
+    header = []
+    run_info = []
+    for i in range(6):
+        header.append(f.readline())
+    for i in range(4):
+        run_info.append(f.readline())
+
+    rhow, g = data2num(run_info[0])
+    lpp, breadth, draught = data2num(run_info[1])
+    LCG, VCG = data2num(run_info[2])
+    version = data2int(run_info[3])
+
+    novel, nohead, nofreq, nodof = data2int(f.readline())
+
+    A = np.zeros((nodof, nodof, nofreq, novel))
+    A_added = np.zeros_like(A)
+    B = np.zeros_like(A)
+    B_added = np.zeros_like(B)
+    C = np.zeros_like(A)
+    C_added = np.zeros_like(A)
+    Bv44_linear = np.zeros((nofreq, nohead, novel))
+    Bv44_nonlin = np.zeros_like(Bv44_linear)
+    Bv44_linearized = np.zeros_like(Bv44_linear)
+
+    Mrb = np.zeros((nodof, nodof))
+    for i in range(nodof):
+        Mrb[i] = [m for m in data2num(f.readline())]
+
+    for v in range(novel):
+        vel, *_ = data2float(f.readline())
+        print(f"Velocity: {vel}")
+        for h in range(nohead):
+            head, *_ = data2float(f.readline())
+            print(f"Heading: {head}")
+            for j in range(nofreq):
+                freq, *_ = data2float(f.readline())
+                print(f"Freq: {freq} [rad/s]")
+                for k in range(nodof):
+                    temp = f.readline()
+                    a_kj = np.array([a for a in data2num(temp)])
+                    A[k, :, j, v] = a_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        A_added[k, :, j, v] = np.array([aa for aa in data2num(temp)])
+                for k in range(nodof):
+                    temp = f.readline()
+                    b_kj = np.array([b for b in data2num(temp)])
+                    B[k, :, j, v] = b_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        B_added[k, :, j, v] = np.array([bb for bb in data2num(temp)])
+                for k in range(nodof):
+                    temp = f.readline()
+                    c_kj = np.array([c for c in data2num(temp)])
+                    C[k, :, j, v] = c_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        C_added[k, :, j, v] = np.array([cc for cc in data2num(temp)])
+                bv_l, bv_nl, bv_ll, *_ = data2num(f.readline())
+                Bv44_linear[j, h, v] = bv_l
+                Bv44_nonlin[j, h, v] = bv_nl
+                Bv44_linearized[j, h, v] = bv_ll
+    
+
+    f.close()
+    return Mrb, A, B, C, Bv44_linear, Bv44_nonlin, Bv44_linearized
+
+
 def read_wave_drift(filepath):
     f = open(filepath, 'r')
 
@@ -532,14 +605,14 @@ def read_wave_drift(filepath):
     for i in range(3):
         run_info.append(f.readline())
 
-    rhow, g_ = data2num(run_info[0])
-    lpp, b, D = data2num(run_info[1])
+    rhow, g = data2num(run_info[0])
+    lpp, breadth, D = data2num(run_info[1])
     novel, nohead, nofreq = data2int(run_info[2])
 
     drift_frc = np.zeros((6, nofreq, nohead, novel))
 
     print("WAVE DRIFT DATA".center(100, '-'))
-    print("Rho_w".ljust(50, ' ') + f"{rho_w}")
+    print("Rho_w".ljust(50, ' ') + f"{rhow}")
     print("Lpp".ljust(50, ' ') + f"{lpp}")
     print(f"Novel: {novel}")
     print(f"Nohead: {nohead}")
@@ -554,9 +627,9 @@ def read_wave_drift(filepath):
                 freq_, *_ = data2float(temp)
                 addr, swdr, yawr, *_ = data2num(temp)
                 print(f"freq: {freq_}\tAddr: {addr:.3E}\tSway:{swdr:.3E}\tYaw: {yawr:.3E}")
-                drift_frc[0, i, h, v] = addr*rhow*g_*b**2/lpp
-                drift_frc[1, i, h, v] = swdr*rhow*g_*b**2/lpp
-                drift_frc[2, i, h, v] = yawr*rhow*g_*b**2
+                drift_frc[0, i, h, v] = addr*rhow*g*breadth**2/lpp
+                drift_frc[1, i, h, v] = swdr*rhow*g*breadth**2/lpp
+                drift_frc[2, i, h, v] = yawr*rhow*g*breadth**2
     f.close()
 
     # Transform from VERES coordinates to MCSimPython coordinates.
@@ -621,7 +694,24 @@ def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
 
 
 def generate_config_file(input_files_paths: list = None, input_file_dir: str = None):
-    """Generate a .json configuration file for a vessel."""
+    """Generate a .json configuration file for a vessel. The function can take
+    either a list of file locations, or the path to the directory containing the
+    result files. 
+    
+    Parameters
+    ----------
+    input_files_paths: list (default = None)
+        List of paths for each input file (result file) from VERES. Should contain
+        .re1, .re2, .re7, and .re8. Defaults to None.
+    input_file_dir : str (default = None)
+        Path to directory containing VERES result files. The folder should contain
+        .re1, .re2, .re7, and .re8. Default to None.
+    
+    See also
+    --------
+    utils.read_tf()
+    utils.read_wave_drift()
+    """
 
     # Verify that the all necessary input files are given.
     # need .re1, .re2, .re7, and .re8
@@ -629,13 +719,14 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     # - .re2 added resistance
     # - .re7 hydrod coeffs
     # - .re8 force rao
+
     file_type_requirm = ['.re1', '.re2', '.re7', '.re8']
     if input_file_types is not None:
         input_file_types = [file[-4:] for file in input_files_paths]
-        try:
+        if not sorted(input_file_types)==sorted(file_type_requirm):
+            raise ValueError(f"The correct files are not distributed. Want: {file_type_requirm} files.")
+        else:
             re1, re2, re7, re8 = input_files_paths
-        except ValueError("Too many variables to extract."):
-            print("Could not extract the result files from VERES.")
     elif input_file_dir is not None:
         input_file_types = [file[-4:] for file in os.listdir(input_file_dir) if 're' in file.split('.')[-1]]
         re1, re2, re7, re8 = [file for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]]
@@ -643,11 +734,16 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
         raise FileNotFoundError("Could not find the result files from VERES.")
     
     vessel_config = {}
+    vessel_config['motionRAO'] = {}
+    vessel_config['forceRAO'] = {}
+    vessel_config['driftfrc'] = {}
+    vessel_config['Bv44'] = {}
     
     # Compute RAOs.
     freqs, headings, vels, motion_rao_c, motion_rao_amp, motion_rao_phase = read_tf(re1)
     _, _, _, force_rao_c, force_rao_amp, force_rao_phase = read_tf(re8)
     drift_frc = read_wave_drift(re2)
+    Mrb, A, B, C, Bv44_lin, Bv44_nonlin, Bv44_linearized = read_hydrod(re7)
 
     # Functions for reading the other files
         ## ADD FUNCTIONS HERE
@@ -664,6 +760,13 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['forceRAO']['phase'] = force_rao_phase.tolist()
     vessel_config['forceRAO']['w'] = freqs.tolist()
     vessel_config['driftfrc']['amp'] = drift_frc.tolist()
+    vessel_config['A'] = A.tolist()
+    vessel_config['B'] = B.tolist()
+    vessel_config['C'] = C.tolist()
+    vessel_config['Mrb'] = Mrb.tolist()
+    vessel_config['Bv44']['Linear'] = Bv44_lin.tolist()
+    vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
+    vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
     
     # Add some saving method here.
     
