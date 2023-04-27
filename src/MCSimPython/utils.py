@@ -17,6 +17,8 @@ from time import time
 from scipy.signal import welch
 import matplotlib.pyplot as plt
 import re
+import os
+import json
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
 dof3_array = np.ix_([0, 1, 5])
@@ -391,6 +393,23 @@ def power_spectral_density(timeseries, fs, freq_hz=False, nperseg=2**11):
     return f, S_f
 
 
+# --------- READ DATA UTILITY FUNCTIONS -------------------
+re_science = "\s{1,}-?\d\.?\d*[Ee][+\-]?\d+"
+re_int = "\s{1,}[0-9]{1,}"
+re_float = "\s{1,}[0-9]{1,}\.[0-9]{1,}"
+
+def data2num(line):
+    return (float(x) for x in re.findall(re_science, line))
+
+
+def data2int(line):
+    return (int(x) for x in re.findall(re_int, line))
+
+
+def data2float(line):
+    return (float(x) for x in re.findall(re_float, line))
+
+
 def read_tf(file_path, tf_type="motion"):
     """Read VERES transfer function output.
     
@@ -436,22 +455,8 @@ def read_tf(file_path, tf_type="motion"):
     VERES use 0 deg as head sea, and 180 deg as following sea. While `MCSimPython` use
     head sea = 180 deg, and following sea = 0 deg. 
     """
-
-    re_science = "\s{1,}-?\d\.?\d*[Ee][+\-]?\d+"
-    re_int = "\s{1,}[0-9]{1,}"
-    re_float = "\s{1,}[0-9]{1,}\.[0-9]{1,}"
-
-    def data2num(line):
-        return (float(x) for x in re.findall(re_science, line))
-
-    def data2int(line):
-        return (int(x) for x in re.findall(re_int, line))
-
-    def data2float(line):
-        return (float(x) for x in re.findall(re_float, line))
     
-    
-    fid = open("input.re1", 'r')
+    fid = open(file_path, 'r')
     header = []
     for i in range(6):
         header.append(fid.readline())
@@ -493,7 +498,7 @@ def read_tf(file_path, tf_type="motion"):
         for h in range(nohead):
             temp_h = fid.readline()
             heading, *_ = data2float(temp_h)
-            headings[h] = heading
+            headings[h] = np.deg2rad(heading)
             print(f"Heading: {heading}")
             
             for f in range(nofreq):
@@ -505,16 +510,54 @@ def read_tf(file_path, tf_type="motion"):
                     temp = fid.readline()
                     d, *_ = data2int(temp)
                     print(f"Dof: {d}")
-                    real, img = data2num(temp)
+                    real, img, *_ = data2num(temp)
                     rao_complex[dof, f, h, v] = real + 1j*img
                     rao_amp[dof, f, h, v] = np.sqrt(real**2 + img**2)
                     rao_phase[dof, f, h, v] = np.arctan2(img, real)
 
-    # Convert the RAOs from VERES frame to body-frame.
-
-
     fid.close()
+    # 1) Convert the RAOs from VERES frame to body-frame.
+    # 2) Make sure that we have raos for the full range 0-360 deg. 
+
     return freqs, headings, velocities, rao_complex, rao_amp, rao_phase
+
+
+def read_wave_drift(filepath):
+    f = open(filepath, 'r')
+
+    header = []
+    run_info = []
+    for i in range(6):
+        header.append(f.readline())
+    for i in range(3):
+        run_info.append(f.readline())
+
+    rhow, g_ = data2num(run_info[0])
+    lpp, b, D = data2num(run_info[1])
+    novel, nohead, nofreq = data2int(run_info[2])
+
+    drft_frc = np.zeros((6, nofreq, nohead, novel))
+
+    print("WAVE DRIFT DATA".center(100, '-'))
+    print("Rho_w".ljust(50, ' ') + f"{rho_w}")
+    print("Lpp".ljust(50, ' ') + f"{lpp}")
+    print(f"Novel: {novel}")
+    print(f"Nohead: {nohead}")
+    print(f"Nofreq: {nofreq}")
+    print(".".center(100, '-'))
+    for v in range(novel):
+        for h in range(nohead):
+            vel, head_i = data2float(f.readline())
+            print(f"Vel: {vel}\t Heading: {head_i}")
+            for i in range(nofreq):
+                temp = f.readline()
+                freq_, *_ = data2float(temp)
+                addr, swdr, yawr, *_ = data2num(temp)
+                print(f"freq: {freq_}\tAddr: {addr:.3E}\tSway:{swdr:.3E}\tYaw: {yawr:.3E}")
+                drft_frc[0, i, h, v] = addr*rhow*g_*b**2/lpp
+                drft_frc[1, i, h, v] = swdr*rhow*g_*b**2/lpp
+                drft_frc[2, i, h, v] = yawr*rhow*g_*b**2
+    f.close()
 
 
 def plot_raos(raos, freqs, rao_type="motion", plot_polar=True, wave_angle=0, figsize=(16, 8)):
@@ -572,3 +615,51 @@ def plot_raos(raos, freqs, rao_type="motion", plot_polar=True, wave_angle=0, fig
             plt.ylabel("$\phi \; [rad]$")
     
     plt.show()
+
+
+def generate_config_file(input_files_paths: list = None, input_file_dir: str = None):
+    """Generate a .json configuration file for a vessel."""
+
+    # Verify that the all necessary input files are given.
+    # need .re1, .re2, .re7, and .re8
+    # - .re1 motion rao
+    # - .re2 added resistance
+    # - .re7 hydrod coeffs
+    # - .re8 force rao
+    file_type_requirm = ['.re1', '.re2', '.re7', '.re8']
+    if input_file_types is not None:
+        input_file_types = [file[-4:] for file in input_files_paths]
+        try:
+            re1, re2, re7, re8 = input_files_paths
+        except ValueError("Too many variables to extract."):
+            print("Could not extract the result files from VERES.")
+    elif input_file_dir is not None:
+        input_file_types = [file[-4:] for file in os.listdir(input_file_dir) if 're' in file.split('.')[-1]]
+        re1, re2, re7, re8 = [file for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]]
+    else:
+        raise FileNotFoundError("Could not find the result files from VERES.")
+    
+    vessel_config = {}
+    
+    # Compute RAOs.
+    freqs, headings, vels, motion_rao_c, motion_rao_amp, motion_rao_phase = read_tf(re1)
+    _, _, _, force_rao_c, force_rao_amp, force_rao_phase = read_tf(re8)
+
+    # Functions for reading the other files
+        ## ADD FUNCTIONS HERE
+    # Add the inputs to dictionary.
+    vessel_config['freqs'] = freqs.tolist()
+    vessel_config['headings'] = headings.tolist()
+    vessel_config['velocity'] = vels.tolist()
+    vessel_config['motionRAO']['complex'] = motion_rao_c.tolist()
+    vessel_config['motionRAO']['amp'] = motion_rao_amp.tolist()
+    vessel_config['motionRAO']['phase'] = motion_rao_phase.tolist()
+    vessel_config['motionRAO']['w'] = freqs.tolist()
+    vessel_config['forceRAO']['complex'] = force_rao_c.tolist()
+    vessel_config['forceRAO']['amp'] = force_rao_amp.tolist()
+    vessel_config['forceRAO']['phase'] = force_rao_phase.tolist()
+    vessel_config['forceRAO']['w'] = freqs.tolist()
+    
+    # Add some saving method here.
+    
+    
