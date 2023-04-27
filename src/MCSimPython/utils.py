@@ -523,7 +523,7 @@ def read_tf(file_path, tf_type="motion"):
 
 
 def read_hydrod(filepath):
-    f = open("input.re7", 'r')
+    f = open(filepath, 'r')
     header = []
     run_info = []
     for i in range(6):
@@ -534,7 +534,8 @@ def read_hydrod(filepath):
     rhow, g = data2num(run_info[0])
     lpp, breadth, draught = data2num(run_info[1])
     LCG, VCG = data2num(run_info[2])
-    version = data2int(run_info[3])
+    version, *_ = data2int(run_info[3])
+    print(f"Version = {version}")
 
     novel, nohead, nofreq, nodof = data2int(f.readline())
 
@@ -721,7 +722,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     # - .re8 force rao
 
     file_type_requirm = ['.re1', '.re2', '.re7', '.re8']
-    if input_file_types is not None:
+    if input_files_paths is not None:
         input_file_types = [file[-4:] for file in input_files_paths]
         if not sorted(input_file_types)==sorted(file_type_requirm):
             raise ValueError(f"The correct files are not distributed. Want: {file_type_requirm} files.")
@@ -729,7 +730,8 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
             re1, re2, re7, re8 = input_files_paths
     elif input_file_dir is not None:
         input_file_types = [file[-4:] for file in os.listdir(input_file_dir) if 're' in file.split('.')[-1]]
-        re1, re2, re7, re8 = [file for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]]
+        print(sorted([os.path.join(input_file_dir, file) for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]]))
+        re1, re2, re7, re8, *_ = sorted([os.path.join(input_file_dir, file) for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]])
     else:
         raise FileNotFoundError("Could not find the result files from VERES.")
     
@@ -768,6 +770,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
     vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
     
+    return vessel_config
     # Add some saving method here.
     
     
