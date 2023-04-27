@@ -460,6 +460,21 @@ def read_tf(file_path, tf_type="motion"):
     for i in range(3):
         data_info.append(fid.readline())
 
+    rho_w, g = data2num(data_info[0])
+    Lpp, breadth, draught = data2num(data_info[1])
+    LCG, VCG = data2num(data_info[2])
+
+    print("Vessel Parameters".center(100, '-'))
+    print(f"Water Density: {rho_w} [kg/m^3].")
+    print(f"Acceleration of gravity: {g} [m/s^2]")
+    print(f"Length between the perpendiculars: {Lpp} [m]")
+    print(f"Breadth: {breadth} [m]")
+    print(f"Draught: {draught} [m]")
+    print(f"Vertical center of gravity (rel. BL): {VCG} [m]")
+    print(f"Longitudinal center of gravity (rel. Lpp/2): {LCG} [m]")
+    print("".center(100, '-'))
+
+
     run_info = fid.readline()
     novel, nohead, nofreq, nodof = data2int(run_info)
 
@@ -472,7 +487,7 @@ def read_tf(file_path, tf_type="motion"):
 
     for v in range(novel):
         k = 0
-        velocity, *_ = data2num(fid.readline())
+        velocity, *_ = data2float(fid.readline())
         velocities[v] = velocity
         print(velocity)
         for h in range(nohead):
