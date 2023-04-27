@@ -145,3 +145,8 @@ class AdaptiveFSController():
         dw = (w_max-w_min)/ self._N
         self._freqs = np.arange(w_min, w_max, dw)
 
+    def set_tuning_params(self, K1: list, K2: list, gamma: float):
+        self._K1 = np.diag(K1)
+        self._K2 = np.diag(K2)
+        self._gamma = np.eye((2*self._N +1)*3) * gamma
+
