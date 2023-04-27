@@ -15,7 +15,8 @@
 import numpy as np
 from time import time
 from scipy.signal import welch
-
+import matplotlib.pyplot as plt
+import re
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
 dof3_array = np.ix_([0, 1, 5])
@@ -388,3 +389,171 @@ def power_spectral_density(timeseries, fs, freq_hz=False, nperseg=2**11):
     if not freq_hz:
         return f*2*np.pi, S_f/(2*np.pi)
     return f, S_f
+
+
+def read_tf(file_path, tf_type="motion"):
+    """Read VERES transfer function output.
+    
+    The function reads data from veres input files. 
+    - Motion RAOs are found in '.re1'
+    - Force RAOs are found in '.re8'
+
+    The RAOs are converted from the global coordinate system in VERES, which
+    is defined as: x-axis positive to stern, y-axis postive to stbd, and 
+    z-axis positive up, to the body frame used on `MCSimPython`.
+    
+    Parameters
+    ----------
+    file_path : string
+        The path to the .re1 or .re8 file.
+    tf_type : string (default='motion')
+        Type of transfer function. Can be either force or motion RAO.
+        If type = 'motion', the input file should be .re1, else
+        the expected file is .re8 for force RAO.
+
+    Returns
+    -------
+    rho_w : float
+        Water density
+    g : float
+        Gravitational acceleration
+    freqs : array_like
+        Array of n frequencies in [rad/s] for which the RAOs are calculated.
+    headings : array_like
+        Array of m headings in [rad] for which the RAOs are calculated.
+    velocities : array_like
+        Array of j velocities [m/s] for which the RAOs are calculated.
+    rao_complex : array_like
+        Array of complex RAOs with dimension (6, n, m, j). Using dtype=np.complex128.
+    rao_amp : array_like
+        Array of RAO amplitudes [m/m] with dimension (6, n, m, j).
+    rao_phase : array_like
+        Array of RAO phase [rad] with dimension (6, n, m, j).
+
+    Note
+    ----
+    The wave direction convention of VERES is different from `MCSimPython`.
+    VERES use 0 deg as head sea, and 180 deg as following sea. While `MCSimPython` use
+    head sea = 180 deg, and following sea = 0 deg. 
+    """
+
+    re_science = "\s{1,}-?\d\.?\d*[Ee][+\-]?\d+"
+    re_int = "\s{1,}[0-9]{1,}"
+    re_float = "\s{1,}[0-9]{1,}\.[0-9]{1,}"
+
+    def data2num(line):
+        return (float(x) for x in re.findall(re_science, line))
+
+    def data2int(line):
+        return (int(x) for x in re.findall(re_int, line))
+
+    def data2float(line):
+        return (float(x) for x in re.findall(re_float, line))
+    
+    
+    fid = open("input.re1", 'r')
+    header = []
+    for i in range(6):
+        header.append(fid.readline())
+
+    data_info = []
+    for i in range(3):
+        data_info.append(fid.readline())
+
+    run_info = fid.readline()
+    novel, nohead, nofreq, nodof = data2int(run_info)
+
+    freqs = np.zeros(nofreq)
+    headings = np.zeros(nohead)
+    velocities = np.zeros(novel)
+    rao_complex = np.zeros((nodof, nofreq, nohead, novel), dtype=np.complex128)
+    rao_amp = np.zeros((nodof, nofreq, nohead, novel))
+    rao_phase = np.zeros_like(rao_amp)
+
+    for v in range(novel):
+        k = 0
+        velocity, *_ = data2num(fid.readline())
+        velocities[v] = velocity
+        print(velocity)
+        for h in range(nohead):
+            temp_h = fid.readline()
+            heading, *_ = data2float(temp_h)
+            headings[h] = heading
+            print(f"Heading: {heading}")
+            
+            for f in range(nofreq):
+                freq_f, *_ = data2float(fid.readline())
+                freqs[f] = freq_f
+                print(freq_f)
+                k = k+1
+                for dof in range(6):
+                    temp = fid.readline()
+                    d, *_ = data2int(temp)
+                    print(f"Dof: {d}")
+                    real, img = data2num(temp)
+                    rao_complex[dof, f, h, v] = real + 1j*img
+                    rao_amp[dof, f, h, v] = np.sqrt(real**2 + img**2)
+                    rao_phase[dof, f, h, v] = np.arctan2(img, real)
+
+    # Convert the RAOs from VERES frame to body-frame.
+
+
+    fid.close()
+    return freqs, headings, velocities, rao_complex, rao_amp, rao_phase
+
+
+def plot_raos(raos, freqs, rao_type="motion", plot_polar=True, wave_angle=0, figsize=(16, 8)):
+    """Plot the force or motion RAOs. 
+
+    The RAOs should be complex. 
+
+    Parameters
+    ----------
+    raos : array_like
+        Array of motion RAOs for k dofs, n freqs, m headings, and j velocities.
+    freqs : array_like
+        Array of frequencies for which the RAOs are computed.
+    rao_type : string (default = "motion")
+        Type of RAO. Either "motion" or "force". Defaults to "motion"
+    plot_polar : bool (default = True)
+        Either plot the RAOs in polar- or cartesian coordinates. Defaults to polar.
+    wave_angle : int (default = 0)
+        Index of the relative incident wave anlge. Defaults to 0, which should
+        correspond to following sea.
+    figsize : tuple (default = (16, 8))
+        Size of the plot. Defaults to (16, 8).  
+    
+    """
+    titles = ["Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw"]
+    if plot_polar:
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True, subplot_kw={'projection': 'polar'})
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.title(f"RAO {titles[i]}")
+            plt.plot(np.angle(raos[i, :, wave_angle, 0]), np.abs(raos[i, :, wave_angle, 0]))
+            plt.plot(np.angle(raos[i, 0, wave_angle, 0]), np.abs(raos[i, 0, wave_angle, 0]), 'ro', label="$\omega_{min}$")
+            plt.plot(np.angle(raos[i, -1, wave_angle, 0]), np.abs(raos[i, -1, wave_angle, 0]), 'go', label="$\omega_{max}$")
+            if i < 3:
+                plt.gca().set_rmax(1)
+            plt.legend()
+
+    if not plot_polar:
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
+        fig.suptitle("RAO Amplitude")
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.plot(freqs, np.abs(raos[i, :, wave_angle, 0]))
+            plt.xlabel("$\omega \; [rad/s]$")
+            if i < 3:
+                plt.ylabel(r"$\frac{\eta}{\zeta_a} \; [\frac{m}{m}]$")
+            else:
+                plt.ylabel(r"$\frac{\eta}{\zeta_a} \; [\frac{rad}{m}]$")
+        
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.plot(freqs, np.angle(raos[i, :, wave_angle, 0]))
+            plt.xlabel("$\omega \; [rad/s]$")
+            plt.ylabel("$\phi \; [rad]$")
+    
+    plt.show()
