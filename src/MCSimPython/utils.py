@@ -536,7 +536,7 @@ def read_wave_drift(filepath):
     lpp, b, D = data2num(run_info[1])
     novel, nohead, nofreq = data2int(run_info[2])
 
-    drft_frc = np.zeros((6, nofreq, nohead, novel))
+    drift_frc = np.zeros((6, nofreq, nohead, novel))
 
     print("WAVE DRIFT DATA".center(100, '-'))
     print("Rho_w".ljust(50, ' ') + f"{rho_w}")
@@ -554,13 +554,16 @@ def read_wave_drift(filepath):
                 freq_, *_ = data2float(temp)
                 addr, swdr, yawr, *_ = data2num(temp)
                 print(f"freq: {freq_}\tAddr: {addr:.3E}\tSway:{swdr:.3E}\tYaw: {yawr:.3E}")
-                drft_frc[0, i, h, v] = addr*rhow*g_*b**2/lpp
-                drft_frc[1, i, h, v] = swdr*rhow*g_*b**2/lpp
-                drft_frc[2, i, h, v] = yawr*rhow*g_*b**2
+                drift_frc[0, i, h, v] = addr*rhow*g_*b**2/lpp
+                drift_frc[1, i, h, v] = swdr*rhow*g_*b**2/lpp
+                drift_frc[2, i, h, v] = yawr*rhow*g_*b**2
     f.close()
 
+    # Transform from VERES coordinates to MCSimPython coordinates.
+    return drift_frc
 
-def plot_raos(raos, freqs, rao_type="motion", plot_polar=True, wave_angle=0, figsize=(16, 8)):
+
+def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
     """Plot the force or motion RAOs. 
 
     The RAOs should be complex. 
@@ -644,6 +647,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     # Compute RAOs.
     freqs, headings, vels, motion_rao_c, motion_rao_amp, motion_rao_phase = read_tf(re1)
     _, _, _, force_rao_c, force_rao_amp, force_rao_phase = read_tf(re8)
+    drift_frc = read_wave_drift(re2)
 
     # Functions for reading the other files
         ## ADD FUNCTIONS HERE
@@ -659,6 +663,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['forceRAO']['amp'] = force_rao_amp.tolist()
     vessel_config['forceRAO']['phase'] = force_rao_phase.tolist()
     vessel_config['forceRAO']['w'] = freqs.tolist()
+    vessel_config['driftfrc']['amp'] = drift_frc.tolist()
     
     # Add some saving method here.
     
