@@ -494,22 +494,18 @@ def read_tf(file_path, tf_type="motion"):
         k = 0
         velocity, *_ = data2float(fid.readline())
         velocities[v] = velocity
-        print(velocity)
         for h in range(nohead):
             temp_h = fid.readline()
             heading, *_ = data2float(temp_h)
             headings[h] = np.deg2rad(heading)
-            print(f"Heading: {heading}")
             
             for f in range(nofreq):
                 freq_f, *_ = data2float(fid.readline())
                 freqs[f] = freq_f
-                print(freq_f)
                 k = k+1
                 for dof in range(6):
                     temp = fid.readline()
                     d, *_ = data2int(temp)
-                    print(f"Dof: {d}")
                     real, img, *_ = data2num(temp)
                     rao_complex[dof, f, h, v] = real + 1j*img
                     rao_amp[dof, f, h, v] = np.sqrt(real**2 + img**2)
@@ -555,13 +551,10 @@ def read_hydrod(filepath):
 
     for v in range(novel):
         vel, *_ = data2float(f.readline())
-        print(f"Velocity: {vel}")
         for h in range(nohead):
             head, *_ = data2float(f.readline())
-            print(f"Heading: {head}")
             for j in range(nofreq):
                 freq, *_ = data2float(f.readline())
-                print(f"Freq: {freq} [rad/s]")
                 for k in range(nodof):
                     temp = f.readline()
                     a_kj = np.array([a for a in data2num(temp)])
@@ -619,21 +612,28 @@ def read_wave_drift(filepath):
     print(f"Nohead: {nohead}")
     print(f"Nofreq: {nofreq}")
     print(".".center(100, '-'))
+
     for v in range(novel):
         for h in range(nohead):
             vel, head_i = data2float(f.readline())
-            print(f"Vel: {vel}\t Heading: {head_i}")
             for i in range(nofreq):
                 temp = f.readline()
                 freq_, *_ = data2float(temp)
                 addr, swdr, yawr, *_ = data2num(temp)
-                print(f"freq: {freq_}\tAddr: {addr:.3E}\tSway:{swdr:.3E}\tYaw: {yawr:.3E}")
                 drift_frc[0, i, h, v] = addr*rhow*g*breadth**2/lpp
                 drift_frc[1, i, h, v] = swdr*rhow*g*breadth**2/lpp
                 drift_frc[2, i, h, v] = yawr*rhow*g*breadth**2
+
     f.close()
 
-    # Transform from VERES coordinates to MCSimPython coordinates.
+    # Transform from VERES frame (x to stern, z up, y stbd) to 
+    # MCSimPython frame (x forward, z down, y stbd)
+    # Both are right hand coordinate systems (only pi rotated about y.)
+
+    T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
+    for i in range(6):
+        drift_frc[i] = T[i]*drift_frc[i]
+
     return drift_frc
 
 
@@ -742,11 +742,16 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['Bv44'] = {}
     
     # Compute RAOs.
+    print("Read input files".center(100, '-'))
+    print("Read motion RAOs (.re1)...")
     freqs, headings, vels, motion_rao_c, motion_rao_amp, motion_rao_phase = read_tf(re1)
+    print("Read force RAOs (.re8)...")
     _, _, _, force_rao_c, force_rao_amp, force_rao_phase = read_tf(re8)
+    print("Read wave drift data (.re2)...")
     drift_frc = read_wave_drift(re2)
+    print("Read hydrodynamic parameters (.re7)...")
     Mrb, A, B, C, Bv44_lin, Bv44_nonlin, Bv44_linearized = read_hydrod(re7)
-
+    print("COMPLETE".center(100, '.'))
     # Functions for reading the other files
         ## ADD FUNCTIONS HERE
     # Add the inputs to dictionary.
