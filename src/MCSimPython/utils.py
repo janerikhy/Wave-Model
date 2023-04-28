@@ -513,7 +513,14 @@ def read_tf(file_path, tf_type="motion"):
 
     fid.close()
     # 1) Convert the RAOs from VERES frame to body-frame.
-    # 2) Make sure that we have raos for the full range 0-360 deg. 
+    # 2) Make sure that we have raos for the full range 0-360 deg.
+
+    # Create a transformation vector. 
+    T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
+
+    for dof in range(6):
+        rao_phase[dof] = rao_phase[dof]*T[dof]
+        rao_complex[dof].imag = rao_complex[dof].imag * T[dof]
 
     return freqs, headings, velocities, rao_complex, rao_amp, rao_phase
 
