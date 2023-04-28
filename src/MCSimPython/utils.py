@@ -518,11 +518,19 @@ def read_tf(file_path, tf_type="motion"):
     # Create a transformation vector. 
     T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
 
-    for dof in range(6):
-        rao_phase[dof] = rao_phase[dof]*T[dof]
-        rao_complex[dof].imag = rao_complex[dof].imag * T[dof]
+    # Flip headings such that they correspond with 
+    # relative wave heading convention of MCSimPython
+    # Note, we need to do this for heading 0 -> heading 180 deg.
+    rao_complex_n = np.flip(rao_complex, axis=2)
+    rao_amp_n = np.flip(rao_amp, axis=2)
+    rao_phase_n = np.flip(rao_phase, axis=2)
+    # headings_n = np.flip(headings)
 
-    return freqs, headings, velocities, rao_complex, rao_amp, rao_phase
+    for dof in range(6):
+        rao_phase_n[dof] = rao_phase_n[dof]*T[dof]
+        rao_complex_n[dof].imag = rao_complex_n[dof].imag * T[dof]
+
+    return freqs, headings, velocities, rao_complex_n, rao_amp_n, rao_phase_n
 
 
 def read_hydrod(filepath):
@@ -638,10 +646,17 @@ def read_wave_drift(filepath):
     # Both are right hand coordinate systems (only pi rotated about y.)
 
     T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
-    for i in range(6):
-        drift_frc[i] = T[i]*drift_frc[i]
 
-    return drift_frc
+    # Flip the order of headings to correspond to MCSimPython
+    # heading convention. (Head sea : beta = 180 deg.)
+    # VERES convention is (Head sea : beta = 0 deg.)
+
+    drift_frc_n = np.flip(drift_frc, axis=2)
+
+    for i in range(6):
+        drift_frc_n[i] = T[i]*drift_frc_n[i]
+
+    return drift_frc_n
 
 
 def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
