@@ -487,8 +487,8 @@ def read_tf(file_path, tf_type="motion"):
     headings = np.zeros(nohead)
     velocities = np.zeros(novel)
     rao_complex = np.zeros((nodof, nofreq, nohead, novel), dtype=np.complex128)
-    rao_amp = np.zeros((nodof, nofreq, nohead, novel))
-    rao_phase = np.zeros_like(rao_amp)
+    rao_amp = np.zeros((nodof, nofreq, nohead, novel), dtype=np.float64)
+    rao_phase = np.zeros_like(rao_amp, dtype=np.float64)
 
     for v in range(novel):
         k = 0
@@ -715,6 +715,54 @@ def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
     
     plt.show()
 
+def _complete_sector_coeffs(vessel_config: dict):
+    freqs = np.asarray(vessel_config['freqs'])
+    vel = np.asarray(vessel_config['velocity'])
+    drift_coeffs = np.asarray(vessel_config['driftfrc']['amp'])
+    headings = np.asarray(vessel_config['headings'])
+    forceRAOc = np.asarray(vessel_config['forceRAO']['complex'])
+    forceRAOamp = np.asarray(vessel_config['forceRAO']['amp'])
+    forceRAOphase = np.asarray(vessel_config['forceRAO']['phase'])
+    motionRAOc = np.asarray(vessel_config['motionRAO']['complex'])
+    motionRAOamp = np.asarray(vessel_config['motionRAO']['amp'])
+    motionRAOphase = np.asarray(vessel_config['motionRAO']['phase'])
+
+    heading_new = np.deg2rad(np.arange(0, 360, 10))
+    forceRAOc_new = np.zeros((6, freqs.size, heading_new.size, vel.size), dtype=np.complex128)
+    forceRAOamp_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    forceRAOphase_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    motionRAOc_new = np.zeros_like(forceRAOc_new, dtype=np.complex128)
+    motionRAOamp_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    motionRAOphase_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+
+    drift_coeffs_new = np.zeros((6, freqs.size, heading_new.size, vel.size))
+
+    # Copy the drift coeffs
+    drift_coeffs_new[:, :, :19, :] = drift_coeffs
+    drift_coeffs_new[0, :, 19:] = np.copy(drift_coeffs[0, :, -2:0:-1])
+    drift_coeffs_new[1, :, 19:] = -np.copy(drift_coeffs[1, :, -2:0:-1])
+    drift_coeffs_new[2, :, 19:] = -np.copy(drift_coeffs[2, :, -2:0:-1])
+
+    new_raos = [forceRAOc_new, forceRAOamp_new, forceRAOphase_new, motionRAOc_new, motionRAOamp_new, motionRAOphase_new]
+    old_raos = [forceRAOc, forceRAOamp, forceRAOphase, motionRAOc, motionRAOamp, motionRAOphase]
+    for i in range(len(new_raos)):
+        new_raos[i][:, :, :19] = old_raos[i]
+        new_raos[i][:, :, 19:] = old_raos[i][:, :, -2:0:-1]
+    
+    for dof in [1, 3, 5]:
+        forceRAOc_new[dof, :, 19:] = np.conjugate(forceRAOc_new[dof, :, 19:])
+        motionRAOc_new[dof, :, 19:] = np.conjugate(motionRAOc_new[dof, :, 19:])
+        forceRAOphase_new[dof, :, 19:] *= -1
+        motionRAOphase_new[dof, :, 19:] *= -1
+    
+    vessel_config['headings'] = heading_new.tolist()
+    vessel_config['motionRAO']['complex'] = motionRAOc_new.tolist()
+    vessel_config['motionRAO']['amp'] = motionRAOamp_new.tolist()
+    vessel_config['motionRAO']['phase'] = motionRAOphase_new.tolist()
+    vessel_config['forceRAO']['complex'] = forceRAOc_new.tolist()
+    vessel_config['forceRAO']['amp'] = forceRAOamp_new.tolist()
+    vessel_config['forceRAO']['phase'] = forceRAOphase_new.tolist()
+    vessel_config['driftfrc']['amp'] = drift_coeffs_new.tolist()
 
 def generate_config_file(input_files_paths: list = None, input_file_dir: str = None):
     """Generate a .json configuration file for a vessel. The function can take
@@ -792,10 +840,19 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['A'] = A.tolist()
     vessel_config['B'] = B.tolist()
     vessel_config['C'] = C.tolist()
-    vessel_config['Mrb'] = Mrb.tolist()
+    vessel_config['MRB'] = Mrb.tolist()
     vessel_config['Bv44']['Linear'] = Bv44_lin.tolist()
     vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
     vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
+    vessel_config['Bv'] = np.zeros((6, 6)).tolist()   # Should add some viscous damping estimates here.
+
+    if headings.size <= 19:
+        print(f"VERES results only for heading {np.min(headings)} to {np.max(headings)}. ")
+        _complete_sector_coeffs(vessel_config)
+    elif np.max(headings) <= np.pi:
+        print(f"VERES results only for headings {headings}.")
+        raise NotImplementedError
+    
     
     return vessel_config
     # Add some saving method here.
