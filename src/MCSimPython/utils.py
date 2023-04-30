@@ -517,6 +517,7 @@ def read_tf(file_path, tf_type="motion"):
 
     # Create a transformation vector. 
     T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
+    T = np.array([-1, 1, -1, -1, 1, -1])
 
     # Flip headings such that they correspond with 
     # relative wave heading convention of MCSimPython
@@ -528,7 +529,8 @@ def read_tf(file_path, tf_type="motion"):
 
     for dof in range(6):
         rao_phase_n[dof] = rao_phase_n[dof]*T[dof]
-        rao_complex_n[dof].imag = rao_complex_n[dof].imag * T[dof]
+        if T[dof] < 0:
+            rao_complex_n[dof] = np.conjugate(rao_complex_n[dof])
 
     return freqs, headings, velocities, rao_complex_n, rao_amp_n, rao_phase_n
 
@@ -645,7 +647,8 @@ def read_wave_drift(filepath):
     # MCSimPython frame (x forward, z down, y stbd)
     # Both are right hand coordinate systems (only pi rotated about y.)
 
-    T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
+    T = J([0., 0., 0., 0., np.pi, 0.])@np.array([1., 1., 1., 1., 1., 1.])
+    T = np.array([-1, 1, -1, -1, 1, -1])
 
     # Flip the order of headings to correspond to MCSimPython
     # heading convention. (Head sea : beta = 180 deg.)
@@ -659,7 +662,7 @@ def read_wave_drift(filepath):
     return drift_frc_n
 
 
-def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
+def plot_raos(raos, freqs, plot_polar=True, rao_type="motion", wave_angle=0, figsize=(16, 8)):
     """Plot the force or motion RAOs. 
 
     The RAOs should be complex. 
@@ -690,7 +693,7 @@ def plot_raos(raos, freqs, plot_polar=True, wave_angle=0, figsize=(16, 8)):
             plt.plot(np.angle(raos[i, :, wave_angle, 0]), np.abs(raos[i, :, wave_angle, 0]))
             plt.plot(np.angle(raos[i, 0, wave_angle, 0]), np.abs(raos[i, 0, wave_angle, 0]), 'ro', label="$\omega_{min}$")
             plt.plot(np.angle(raos[i, -1, wave_angle, 0]), np.abs(raos[i, -1, wave_angle, 0]), 'go', label="$\omega_{max}$")
-            if i < 3:
+            if (i < 3) and (rao_type == "motion"):
                 plt.gca().set_rmax(1)
             plt.legend()
 
@@ -748,6 +751,8 @@ def _complete_sector_coeffs(vessel_config: dict):
     for i in range(len(new_raos)):
         new_raos[i][:, :, :19] = old_raos[i]
         new_raos[i][:, :, 19:] = old_raos[i][:, :, -2:0:-1]
+    
+    # T = np.array([-1, 1, -1, -1, 1, -1])
     
     for dof in [1, 3, 5]:
         forceRAOc_new[dof, :, 19:] = np.conjugate(forceRAOc_new[dof, :, 19:])
@@ -844,6 +849,8 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['Bv44']['Linear'] = Bv44_lin.tolist()
     vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
     vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
+    Bv = np.zeros((6, 6))
+    # Bv[3, 3] = Bv44_linearized
     vessel_config['Bv'] = np.zeros((6, 6)).tolist()   # Should add some viscous damping estimates here.
 
     if headings.size <= 19:
