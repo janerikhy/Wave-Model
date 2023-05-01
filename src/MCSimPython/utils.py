@@ -15,7 +15,10 @@
 import numpy as np
 from time import time
 from scipy.signal import welch
-
+import matplotlib.pyplot as plt
+import re
+import os
+import json
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
 dof3_array = np.ix_([0, 1, 5])
@@ -388,3 +391,477 @@ def power_spectral_density(timeseries, fs, freq_hz=False, nperseg=2**11):
     if not freq_hz:
         return f*2*np.pi, S_f/(2*np.pi)
     return f, S_f
+
+
+# --------- READ DATA UTILITY FUNCTIONS -------------------
+re_science = "\s{1,}-?\d\.?\d*[Ee][+\-]?\d+"
+re_int = "\s{1,}[0-9]{1,}"
+re_float = "\s{1,}[0-9]{1,}\.[0-9]{1,}"
+
+def data2num(line):
+    return (float(x) for x in re.findall(re_science, line))
+
+
+def data2int(line):
+    return (int(x) for x in re.findall(re_int, line))
+
+
+def data2float(line):
+    return (float(x) for x in re.findall(re_float, line))
+
+
+def read_tf(file_path, tf_type="motion"):
+    """Read VERES transfer function output.
+    
+    The function reads data from veres input files. 
+    - Motion RAOs are found in '.re1'
+    - Force RAOs are found in '.re8'
+
+    The RAOs are converted from the global coordinate system in VERES, which
+    is defined as: x-axis positive to stern, y-axis postive to stbd, and 
+    z-axis positive up, to the body frame used on `MCSimPython`.
+    
+    Parameters
+    ----------
+    file_path : string
+        The path to the .re1 or .re8 file.
+    tf_type : string (default='motion')
+        Type of transfer function. Can be either force or motion RAO.
+        If type = 'motion', the input file should be .re1, else
+        the expected file is .re8 for force RAO.
+
+    Returns
+    -------
+    rho_w : float
+        Water density
+    g : float
+        Gravitational acceleration
+    freqs : array_like
+        Array of n frequencies in [rad/s] for which the RAOs are calculated.
+    headings : array_like
+        Array of m headings in [rad] for which the RAOs are calculated.
+    velocities : array_like
+        Array of j velocities [m/s] for which the RAOs are calculated.
+    rao_complex : array_like
+        Array of complex RAOs with dimension (6, n, m, j). Using dtype=np.complex128.
+    rao_amp : array_like
+        Array of RAO amplitudes [m/m] with dimension (6, n, m, j).
+    rao_phase : array_like
+        Array of RAO phase [rad] with dimension (6, n, m, j).
+
+    Note
+    ----
+    The wave direction convention of VERES is different from `MCSimPython`.
+    VERES use 0 deg as head sea, and 180 deg as following sea. While `MCSimPython` use
+    head sea = 180 deg, and following sea = 0 deg. 
+    """
+    
+    fid = open(file_path, 'r')
+    header = []
+    for i in range(6):
+        header.append(fid.readline())
+
+    data_info = []
+    for i in range(3):
+        data_info.append(fid.readline())
+
+    rho_w, g = data2num(data_info[0])
+    Lpp, breadth, draught = data2num(data_info[1])
+    LCG, VCG = data2num(data_info[2])
+
+    print("Vessel Parameters".center(100, '-'))
+    print(f"Water Density: {rho_w} [kg/m^3].")
+    print(f"Acceleration of gravity: {g} [m/s^2]")
+    print(f"Length between the perpendiculars: {Lpp} [m]")
+    print(f"Breadth: {breadth} [m]")
+    print(f"Draught: {draught} [m]")
+    print(f"Vertical center of gravity (rel. BL): {VCG} [m]")
+    print(f"Longitudinal center of gravity (rel. Lpp/2): {LCG} [m]")
+    print("".center(100, '-'))
+
+
+    run_info = fid.readline()
+    novel, nohead, nofreq, nodof = data2int(run_info)
+
+    freqs = np.zeros(nofreq)
+    headings = np.zeros(nohead)
+    velocities = np.zeros(novel)
+    rao_complex = np.zeros((nodof, nofreq, nohead, novel), dtype=np.complex128)
+    rao_amp = np.zeros((nodof, nofreq, nohead, novel), dtype=np.float64)
+    rao_phase = np.zeros_like(rao_amp, dtype=np.float64)
+
+    for v in range(novel):
+        k = 0
+        velocity, *_ = data2float(fid.readline())
+        velocities[v] = velocity
+        for h in range(nohead):
+            temp_h = fid.readline()
+            heading, *_ = data2float(temp_h)
+            headings[h] = np.deg2rad(heading)
+            
+            for f in range(nofreq):
+                freq_f, *_ = data2float(fid.readline())
+                freqs[f] = freq_f
+                k = k+1
+                for dof in range(6):
+                    temp = fid.readline()
+                    d, *_ = data2int(temp)
+                    real, img, *_ = data2num(temp)
+                    rao_complex[dof, f, h, v] = real + 1j*img
+                    rao_amp[dof, f, h, v] = np.sqrt(real**2 + img**2)
+                    rao_phase[dof, f, h, v] = np.arctan2(img, real)
+
+    fid.close()
+    # 1) Convert the RAOs from VERES frame to body-frame.
+    # 2) Make sure that we have raos for the full range 0-360 deg.
+
+    # Create a transformation vector. 
+    T = J([0., 0., 0., 0., np.pi, 0.])@np.ones(6)
+    T = np.array([-1, 1, -1, -1, 1, -1])
+
+    # Flip headings such that they correspond with 
+    # relative wave heading convention of MCSimPython
+    # Note, we need to do this for heading 0 -> heading 180 deg.
+    rao_complex_n = np.flip(rao_complex, axis=2)
+    rao_amp_n = np.flip(rao_amp, axis=2)
+    rao_phase_n = np.flip(rao_phase, axis=2)
+    # headings_n = np.flip(headings)
+
+    for dof in range(6):
+        rao_phase_n[dof] = rao_phase_n[dof]*T[dof]
+        if T[dof] < 0:
+            rao_complex_n[dof] = np.conjugate(rao_complex_n[dof])
+
+    return freqs, headings, velocities, rao_complex_n, rao_amp_n, rao_phase_n
+
+
+def read_hydrod(filepath):
+    f = open(filepath, 'r')
+    header = []
+    run_info = []
+    for i in range(6):
+        header.append(f.readline())
+    for i in range(4):
+        run_info.append(f.readline())
+
+    rhow, g = data2num(run_info[0])
+    lpp, breadth, draught = data2num(run_info[1])
+    LCG, VCG = data2num(run_info[2])
+    version, *_ = data2int(run_info[3])
+    print(f"Version = {version}")
+
+    novel, nohead, nofreq, nodof = data2int(f.readline())
+
+    A = np.zeros((nodof, nodof, nofreq, novel))
+    A_added = np.zeros_like(A)
+    B = np.zeros_like(A)
+    B_added = np.zeros_like(B)
+    C = np.zeros_like(A)
+    C_added = np.zeros_like(A)
+    Bv44_linear = np.zeros((nofreq, nohead, novel))
+    Bv44_nonlin = np.zeros_like(Bv44_linear)
+    Bv44_linearized = np.zeros_like(Bv44_linear)
+
+    Mrb = np.zeros((nodof, nodof))
+    for i in range(nodof):
+        Mrb[i] = [m for m in data2num(f.readline())]
+
+    for v in range(novel):
+        vel, *_ = data2float(f.readline())
+        for h in range(nohead):
+            head, *_ = data2float(f.readline())
+            for j in range(nofreq):
+                freq, *_ = data2float(f.readline())
+                for k in range(nodof):
+                    temp = f.readline()
+                    a_kj = np.array([a for a in data2num(temp)])
+                    A[k, :, j, v] = a_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        A_added[k, :, j, v] = np.array([aa for aa in data2num(temp)])
+                for k in range(nodof):
+                    temp = f.readline()
+                    b_kj = np.array([b for b in data2num(temp)])
+                    B[k, :, j, v] = b_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        B_added[k, :, j, v] = np.array([bb for bb in data2num(temp)])
+                for k in range(nodof):
+                    temp = f.readline()
+                    c_kj = np.array([c for c in data2num(temp)])
+                    C[k, :, j, v] = c_kj
+                if version==2:
+                    for k in range(nodof):
+                        temp = f.readline()
+                        C_added[k, :, j, v] = np.array([cc for cc in data2num(temp)])
+                bv_l, bv_nl, bv_ll, *_ = data2num(f.readline())
+                Bv44_linear[j, h, v] = bv_l
+                Bv44_nonlin[j, h, v] = bv_nl
+                Bv44_linearized[j, h, v] = bv_ll
+    
+
+    f.close()
+    return Mrb, A, B, C, Bv44_linear, Bv44_nonlin, Bv44_linearized
+
+
+def read_wave_drift(filepath):
+    f = open(filepath, 'r')
+
+    header = []
+    run_info = []
+    for i in range(6):
+        header.append(f.readline())
+    for i in range(3):
+        run_info.append(f.readline())
+
+    rhow, g = data2num(run_info[0])
+    lpp, breadth, D = data2num(run_info[1])
+    novel, nohead, nofreq = data2int(run_info[2])
+
+    drift_frc = np.zeros((6, nofreq, nohead, novel))
+
+    print("WAVE DRIFT DATA".center(100, '-'))
+    print("Rho_w".ljust(50, ' ') + f"{rhow}")
+    print("Lpp".ljust(50, ' ') + f"{lpp}")
+    print(f"Novel: {novel}")
+    print(f"Nohead: {nohead}")
+    print(f"Nofreq: {nofreq}")
+    print(".".center(100, '-'))
+
+    for v in range(novel):
+        for h in range(nohead):
+            vel, head_i = data2float(f.readline())
+            for i in range(nofreq):
+                temp = f.readline()
+                freq_, *_ = data2float(temp)
+                addr, swdr, yawr, *_ = data2num(temp)
+                drift_frc[0, i, h, v] = addr*rhow*g*breadth**2/lpp
+                drift_frc[1, i, h, v] = swdr*rhow*g*breadth**2/lpp
+                drift_frc[2, i, h, v] = yawr*rhow*g*breadth**2
+
+    f.close()
+
+    # Transform from VERES frame (x to stern, z up, y stbd) to 
+    # MCSimPython frame (x forward, z down, y stbd)
+    # Both are right hand coordinate systems (only pi rotated about y.)
+
+    T = J([0., 0., 0., 0., np.pi, 0.])@np.array([1., 1., 1., 1., 1., 1.])
+    T = np.array([-1, 1, -1, -1, 1, -1])
+
+    # Flip the order of headings to correspond to MCSimPython
+    # heading convention. (Head sea : beta = 180 deg.)
+    # VERES convention is (Head sea : beta = 0 deg.)
+
+    drift_frc_n = np.flip(drift_frc, axis=2)
+
+    for i in range(6):
+        drift_frc_n[i] = T[i]*drift_frc_n[i]
+
+    return drift_frc_n
+
+
+def plot_raos(raos, freqs, plot_polar=True, rao_type="motion", wave_angle=0, figsize=(16, 8)):
+    """Plot the force or motion RAOs. 
+
+    The RAOs should be complex. 
+
+    Parameters
+    ----------
+    raos : array_like
+        Array of motion RAOs for k dofs, n freqs, m headings, and j velocities.
+    freqs : array_like
+        Array of frequencies for which the RAOs are computed.
+    rao_type : string (default = "motion")
+        Type of RAO. Either "motion" or "force". Defaults to "motion"
+    plot_polar : bool (default = True)
+        Either plot the RAOs in polar- or cartesian coordinates. Defaults to polar.
+    wave_angle : int (default = 0)
+        Index of the relative incident wave anlge. Defaults to 0, which should
+        correspond to following sea.
+    figsize : tuple (default = (16, 8))
+        Size of the plot. Defaults to (16, 8).  
+    
+    """
+    titles = ["Surge", "Sway", "Heave", "Roll", "Pitch", "Yaw"]
+    if plot_polar:
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True, subplot_kw={'projection': 'polar'})
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.title(f"RAO {titles[i]}")
+            plt.plot(np.angle(raos[i, :, wave_angle, 0]), np.abs(raos[i, :, wave_angle, 0]))
+            plt.plot(np.angle(raos[i, 0, wave_angle, 0]), np.abs(raos[i, 0, wave_angle, 0]), 'ro', label="$\omega_{min}$")
+            plt.plot(np.angle(raos[i, -1, wave_angle, 0]), np.abs(raos[i, -1, wave_angle, 0]), 'go', label="$\omega_{max}$")
+            if (i < 3) and (rao_type == "motion"):
+                plt.gca().set_rmax(1)
+            plt.legend()
+
+    if not plot_polar:
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
+        fig.suptitle("RAO Amplitude")
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.plot(freqs, np.abs(raos[i, :, wave_angle, 0]))
+            plt.xlabel("$\omega \; [rad/s]$")
+            if i < 3:
+                plt.ylabel(r"$\frac{\eta}{\zeta_a} \; [\frac{m}{m}]$")
+            else:
+                plt.ylabel(r"$\frac{\eta}{\zeta_a} \; [\frac{rad}{m}]$")
+        
+        fig, axs = plt.subplots(2, 3, figsize=figsize, constrained_layout=True)
+        for i in range(6):
+            plt.sca(axs[i//3, i%3])
+            plt.plot(freqs, np.angle(raos[i, :, wave_angle, 0]))
+            plt.xlabel("$\omega \; [rad/s]$")
+            plt.ylabel("$\phi \; [rad]$")
+    
+    plt.show()
+
+def _complete_sector_coeffs(vessel_config: dict):
+    freqs = np.asarray(vessel_config['freqs'])
+    vel = np.asarray(vessel_config['velocity'])
+    drift_coeffs = np.asarray(vessel_config['driftfrc']['amp'])
+    headings = np.asarray(vessel_config['headings'])
+    forceRAOc = np.asarray(vessel_config['forceRAO']['complex'])
+    forceRAOamp = np.asarray(vessel_config['forceRAO']['amp'])
+    forceRAOphase = np.asarray(vessel_config['forceRAO']['phase'])
+    motionRAOc = np.asarray(vessel_config['motionRAO']['complex'])
+    motionRAOamp = np.asarray(vessel_config['motionRAO']['amp'])
+    motionRAOphase = np.asarray(vessel_config['motionRAO']['phase'])
+
+    heading_new = np.deg2rad(np.arange(0, 360, 10))
+    forceRAOc_new = np.zeros((6, freqs.size, heading_new.size, vel.size), dtype=np.complex128)
+    forceRAOamp_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    forceRAOphase_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    motionRAOc_new = np.zeros_like(forceRAOc_new, dtype=np.complex128)
+    motionRAOamp_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+    motionRAOphase_new = np.zeros_like(forceRAOc_new, dtype=np.float64)
+
+    drift_coeffs_new = np.zeros((6, freqs.size, heading_new.size, vel.size))
+
+    # Copy the drift coeffs
+    drift_coeffs_new[:, :, :19, :] = drift_coeffs
+    drift_coeffs_new[0, :, 19:] = np.copy(drift_coeffs[0, :, -2:0:-1])
+    drift_coeffs_new[1, :, 19:] = -np.copy(drift_coeffs[1, :, -2:0:-1])
+    drift_coeffs_new[2, :, 19:] = -np.copy(drift_coeffs[2, :, -2:0:-1])
+
+    new_raos = [forceRAOc_new, forceRAOamp_new, forceRAOphase_new, motionRAOc_new, motionRAOamp_new, motionRAOphase_new]
+    old_raos = [forceRAOc, forceRAOamp, forceRAOphase, motionRAOc, motionRAOamp, motionRAOphase]
+    for i in range(len(new_raos)):
+        new_raos[i][:, :, :19] = old_raos[i]
+        new_raos[i][:, :, 19:] = old_raos[i][:, :, -2:0:-1]
+    
+    # T = np.array([-1, 1, -1, -1, 1, -1])
+    
+    for dof in [1, 3, 5]:
+        forceRAOc_new[dof, :, 19:] = np.conjugate(forceRAOc_new[dof, :, 19:])
+        motionRAOc_new[dof, :, 19:] = np.conjugate(motionRAOc_new[dof, :, 19:])
+        forceRAOphase_new[dof, :, 19:] *= -1
+        motionRAOphase_new[dof, :, 19:] *= -1
+    
+    vessel_config['headings'] = heading_new.tolist()
+    vessel_config['motionRAO']['complex'] = motionRAOc_new.tolist()
+    vessel_config['motionRAO']['amp'] = motionRAOamp_new.tolist()
+    vessel_config['motionRAO']['phase'] = motionRAOphase_new.tolist()
+    vessel_config['forceRAO']['complex'] = forceRAOc_new.tolist()
+    vessel_config['forceRAO']['amp'] = forceRAOamp_new.tolist()
+    vessel_config['forceRAO']['phase'] = forceRAOphase_new.tolist()
+    vessel_config['driftfrc']['amp'] = drift_coeffs_new.tolist()
+
+def generate_config_file(input_files_paths: list = None, input_file_dir: str = None):
+    """Generate a .json configuration file for a vessel. The function can take
+    either a list of file locations, or the path to the directory containing the
+    result files. 
+    
+    Parameters
+    ----------
+    input_files_paths: list (default = None)
+        List of paths for each input file (result file) from VERES. Should contain
+        .re1, .re2, .re7, and .re8. Defaults to None.
+    input_file_dir : str (default = None)
+        Path to directory containing VERES result files. The folder should contain
+        .re1, .re2, .re7, and .re8. Default to None.
+    
+    See also
+    --------
+    utils.read_tf()
+    utils.read_wave_drift()
+    """
+
+    # Verify that the all necessary input files are given.
+    # need .re1, .re2, .re7, and .re8
+    # - .re1 motion rao
+    # - .re2 added resistance
+    # - .re7 hydrod coeffs
+    # - .re8 force rao
+
+    file_type_requirm = ['.re1', '.re2', '.re7', '.re8']
+    if input_files_paths is not None:
+        input_file_types = [file[-4:] for file in input_files_paths]
+        if not sorted(input_file_types)==sorted(file_type_requirm):
+            raise ValueError(f"The correct files are not distributed. Want: {file_type_requirm} files.")
+        else:
+            re1, re2, re7, re8 = input_files_paths
+    elif input_file_dir is not None:
+        input_file_types = [file[-4:] for file in os.listdir(input_file_dir) if 're' in file.split('.')[-1]]
+        print(sorted([os.path.join(input_file_dir, file) for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]]))
+        re1, re2, re7, re8, *_ = sorted([os.path.join(input_file_dir, file) for file in os.listdir(input_file_dir) if "re" in file.split('.')[-1]])
+    else:
+        raise FileNotFoundError("Could not find the result files from VERES.")
+    
+    vessel_config = {}
+    vessel_config['motionRAO'] = {}
+    vessel_config['forceRAO'] = {}
+    vessel_config['driftfrc'] = {}
+    vessel_config['Bv44'] = {}
+    
+    # Compute RAOs.
+    print("Read input files".center(100, '-'))
+    print("Read motion RAOs (.re1)...")
+    freqs, headings, vels, motion_rao_c, motion_rao_amp, motion_rao_phase = read_tf(re1)
+    print("Read force RAOs (.re8)...")
+    _, _, _, force_rao_c, force_rao_amp, force_rao_phase = read_tf(re8)
+    print("Read wave drift data (.re2)...")
+    drift_frc = read_wave_drift(re2)
+    print("Read hydrodynamic parameters (.re7)...")
+    Mrb, A, B, C, Bv44_lin, Bv44_nonlin, Bv44_linearized = read_hydrod(re7)
+    print("COMPLETE".center(100, '.'))
+    # Functions for reading the other files
+        ## ADD FUNCTIONS HERE
+    # Add the inputs to dictionary.
+    vessel_config['freqs'] = freqs.tolist()
+    vessel_config['headings'] = headings.tolist()
+    vessel_config['velocity'] = vels.tolist()
+    vessel_config['motionRAO']['complex'] = motion_rao_c.tolist()
+    vessel_config['motionRAO']['amp'] = motion_rao_amp.tolist()
+    vessel_config['motionRAO']['phase'] = motion_rao_phase.tolist()
+    vessel_config['motionRAO']['w'] = freqs.tolist()
+    vessel_config['forceRAO']['complex'] = force_rao_c.tolist()
+    vessel_config['forceRAO']['amp'] = force_rao_amp.tolist()
+    vessel_config['forceRAO']['phase'] = force_rao_phase.tolist()
+    vessel_config['forceRAO']['w'] = freqs.tolist()
+    vessel_config['driftfrc']['amp'] = drift_frc.tolist()
+    vessel_config['A'] = A.tolist()
+    vessel_config['B'] = B.tolist()
+    vessel_config['C'] = C.tolist()
+    vessel_config['MRB'] = Mrb.tolist()
+    vessel_config['Bv44']['Linear'] = Bv44_lin.tolist()
+    vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
+    vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
+    Bv = np.zeros((6, 6))
+    # Bv[3, 3] = Bv44_linearized
+    vessel_config['Bv'] = np.zeros((6, 6)).tolist()   # Should add some viscous damping estimates here.
+
+    if headings.size <= 19:
+        print(f"VERES results only for heading {np.min(headings)} to {np.max(headings)}. ")
+        _complete_sector_coeffs(vessel_config)
+    elif np.max(headings) <= np.pi:
+        print(f"VERES results only for headings {headings}.")
+        raise NotImplementedError
+    
+    
+    return vessel_config
+    # Add some saving method here.
+    
+    
