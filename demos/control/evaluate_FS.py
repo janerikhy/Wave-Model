@@ -22,7 +22,7 @@ from MCSimPython.vessel_data.CSAD.thruster_data import lx, ly, K
 
 # Sim parameters --------------------------------------------------------
 dt = 0.02
-N = 200
+N = 20000
 np.random.seed(1234)
 # Plot white noise and observe
 
@@ -59,98 +59,121 @@ wave_dir = np.deg2rad(180) * np.ones(N_w)           # Direction
 waveload = wave.WaveLoad(wave_amps, w_wave, eps, wave_dir, 
                             config_file=vessel._config_file) 
 
+# Initialize and run simulation for different number of frequency components
 
+N_adap_lst = [1, 5, 10, 15, 20]
+for i in range(len(N_adap_lst)):
+    # Observer ----------------------------------------------------------
+    observer = LTVKF(dt, vessel._M, vessel._D, Tp=tp)
+    observer.set_tuning_matrices(
+                np.array([
+                    [1e8,0,0,0,0,0],
+                    [0,1e4,0,0,0,0],
+                    [0,0,10*np.pi/180,0,0,0],
+                    [0,0,0,1e3,0,0],
+                    [0,0,0,0,1e3,0],
+                    [0,0,0,0,0,1e2]]), 
+                np.array([
+                    [1,0,0],
+                    [0,1,0],
+                    [0,0,50*np.pi/180]]))
 
-# Observer ----------------------------------------------------------
-observer = LTVKF(dt, vessel._M, vessel._D, Tp=tp)
-observer.set_tuning_matrices(
-            np.array([
-                [1e8,0,0,0,0,0],
-                [0,1e4,0,0,0,0],
-                [0,0,10*np.pi/180,0,0,0],
-                [0,0,0,1e3,0,0],
-                [0,0,0,0,1e3,0],
-                [0,0,0,0,0,1e2]]), 
-            np.array([
-                [1,0,0],
-                [0,1,0],
-                [0,0,50*np.pi/180]]))
-
-# Reference model -----------------------------------------------------
-ref_model = ref.ThrdOrderRefFilter(dt, omega = [.25, .2, .2])   #
-eta_ref = np.zeros((N, 3))                                      # Stationkeeping
-
-
-
-# Controller ----------------------------------------------------------
-N_adap = 20
-controller = AdaptiveFSController(dt, vessel._M, vessel._D, N = N_adap)
-
-w_min_adap = 1
-w_max_adap = 2
-#controller.set_freqs(w_min_adap, w_max_adap, N_adap)
-#controller.set_tuning_params()
+    # Reference model -----------------------------------------------------
+    ref_model = ref.ThrdOrderRefFilter(dt, omega = [.25, .2, .2])   #
+    eta_ref = np.zeros((N, 3))                                      # Stationkeeping
 
 
 
-# Thrust allocation --------------------------------------------------
-thrust_dynamics = ThrusterDynamics()
-thrust_allocation = fixed_angle_allocator()
-for i in range(6):
-    thrust_allocation.add_thruster(Thruster([lx[i],ly[i]],K[i]))
+    # Controller ----------------------------------------------------------
+    N_adap = N_adap_lst[i]
+    controller = AdaptiveFSController(dt, vessel._M, vessel._D, N = N_adap)
+
+    w_min_adap = 1
+    w_max_adap = 2
+    #controller.set_freqs(w_min_adap, w_max_adap, N_adap)
+    #controller.set_tuning_params()
 
 
 
-wave_realization = jonswap.realization(time=np.arange(0,N*dt,dt), hs = hs, tp=tp)
+    # Thrust allocation --------------------------------------------------
+    thrust_dynamics = ThrusterDynamics()
+    thrust_allocation = fixed_angle_allocator()
+    for i in range(6):
+        thrust_allocation.add_thruster(Thruster([lx[i],ly[i]],K[i]))
 
-# Simulation ========================================================
-N_theta = (6*N_adap + 3)
-storage = np.zeros((N, 78 + N_theta))
+    wave_realization = jonswap.realization(time=np.arange(0, N*dt, dt), hs = hs, tp=tp)
+
+    # Simulation ========================================================
+    N_theta = (6*N_adap + 3)
+    storage = np.zeros((N, 78 + N_theta))
 
 
-for i in tqdm(range(N)):
-    t = (i+1)*dt
+    for i in tqdm(range(N)):
+        t = (i+1)*dt
+        
+        zeta= wave_realization[i]
+        
+        # Accurate heading measurement
+        psi = vessel.get_eta()[-1]
+
+        # Ref. model
+        eta_d, eta_d_dot, eta_d_ddot = np.zeros(3), np.zeros(3) , np.zeros(3)                                                     # 3 DOF
+        nu_d = Rz(psi).T@eta_d_dot
+
+        # Wave forces
+        tau_w_first = waveload.first_order_loads(t, vessel.get_eta())
+        tau_w_second = waveload.second_order_loads(t, vessel.get_eta()[-1])
+        tau_w = tau_w_first + tau_w_second
+
+        # Controller
+        time_ctrl = time()
+        tau_cmd, bias_ctrl = controller.get_tau(observer.get_eta_hat(), eta_d,  observer.get_nu_hat(), eta_d_dot, eta_d_ddot, t, calculate_bias = True)
+        time_ctrl2 = time() - time_ctrl
+
+        theta_hat = controller.theta_hat
+
+        # Thrust allocation - not used - SATURATION
+        u, alpha = thrust_allocation.allocate(tau_cmd)
+        tau_ctrl = thrust_dynamics.get_tau(u, alpha)
+
+        # Measurement
+        noise = np.concatenate((np.random.normal(0,.001,size=3),np.random.normal(0,.0002,size=3)))
+        y = np.array(vessel.get_eta() + noise)
+
+        # Observer
+        observer.update(tau_ctrl, six2threeDOF(y), psi)
+
+        # Calculate x_dot and integrate
+        tau = three2sixDOF(tau_ctrl) + tau_w
+        vessel.integrate(U, beta_u, tau)
+
+        storage[i] = np.concatenate([t, vessel.get_eta(), vessel.get_nu(), eta_d, nu_d, y, tau_cmd, tau_w, 
+                                    observer.get_x_hat(), eta_ref[i], bias_ctrl, tau_ctrl, time_ctrl2, tau_w_first, 
+                                    tau_w_second, u, zeta, theta_hat], axis=None)
+                                    # OBSOBS: Legg inn ny data i storage FØR theta_hat
+
+
+    headers = ['time', 'eta1', 'eta2', 'eta3', 'eta4', 'eta5', 'eta6', 'nu1','nu2','nu3','nu4','nu5','nu6','eta_d_1', 'eta_d_2', 'eta_d_6', 'nu_d_1','nu_d_2','nu_d_6', 'y1','y2','y3','y4','y5','y6',
+            'tau_cmd_1','tau_cmd_2','tau_cmd_6', 'tau_w_1', 'tau_w_2','tau_w_3','tau_w_4','tau_w_5','tau_w_6', 'xi_hat_1', 'xi_hat_2','xi_hat_3','xi_hat_4','xi_hat_5','xi_hat_6', 
+            'eta_hat_1', 'eta_hat_2', 'eta_hat_6', 'bias_hat_1', 'bias_hat_2', 'bias_hat_6', 'nu_hat_1', 'nu_hat_2', 'nu_hat_6', 'eta_ref_1','eta_ref_2','eta_ref_6', 
+            'bias_ctrl_1','bias_ctrl_2','bias_ctrl_6', 'tau_ctrl_1', 'tau_ctrl_2', 'tau_ctrl_6', 'time_ctrl', 'tau_w_first_1','tau_w_first_2','tau_w_first_3','tau_w_first_4',
+            'tau_w_first_5','tau_w_first_6', 'tau_w_second_1','tau_w_second_2','tau_w_second_3','tau_w_second_4', 'tau_w_second_5','tau_w_second_6', 'u1','u2','u3','u4','u5',
+            'u6','zeta']
     
-    zeta= wave_realization[i]
-    
-    # Accurate heading measurement
-    psi = vessel.get_eta()[-1]
+    for i in range(N_theta):
+        headers.append('theta_hat_'+str(i+1))
 
-    # Ref. model
-    eta_d, eta_d_dot, eta_d_ddot = np.zeros(3), np.zeros(3) , np.zeros(3)                                                     # 3 DOF
-    nu_d = Rz(psi).T@eta_d_dot
 
-    # Wave forces
-    tau_w_first = waveload.first_order_loads(t, vessel.get_eta())
-    tau_w_second = waveload.second_order_loads(t, vessel.get_eta()[-1])
-    tau_w = tau_w_first + tau_w_second
+    # Create dataframe
+    df = pd.DataFrame(storage, columns=headers)
+    # Convert to csv
+    df.to_csv('Hs'+str(hs)+'_Tp'+str(tp)+'_N'+str(N_adap)+'.csv')
 
-    # Controller
-    time_ctrl = time()
-    tau_cmd, bias_ctrl = controller.get_tau(observer.get_eta_hat(), eta_d,  observer.get_nu_hat(), eta_d_dot, eta_d_ddot, t, calculate_bias = True)
-    time_ctrl2 = time() - time_ctrl
 
-    theta_hat = controller.theta_hat
 
-    # Thrust allocation - not used - SATURATION
-    u, alpha = thrust_allocation.allocate(tau_cmd)
-    tau_ctrl = thrust_dynamics.get_tau(u, alpha)
 
-    # Measurement
-    noise = np.concatenate((np.random.normal(0,.001,size=3),np.random.normal(0,.0002,size=3)))
-    y = np.array(vessel.get_eta() + noise)
 
-    # Observer
-    observer.update(tau_ctrl, six2threeDOF(y), psi)
-
-    # Calculate x_dot and integrate
-    tau = three2sixDOF(tau_ctrl) + tau_w
-    vessel.integrate(U, beta_u, tau)
-
-    storage[i] = np.concatenate([t, vessel.get_eta(), vessel.get_nu(), eta_d, nu_d, y, tau_cmd, tau_w, 
-                                 observer.get_x_hat(), eta_ref[i], bias_ctrl, tau_ctrl, time_ctrl2, tau_w_first, 
-                                 tau_w_second, u, zeta, theta_hat], axis=None)
-                                # OBSOBS: Legg inn ny data i storage FØR theta_hat
+'''
 
 # Post processing 
 # ============================================================================================
@@ -175,24 +198,6 @@ tau_w_second = storage[:, 65:71]
 u = storage[:, 71:77]
 zeta = storage[:,77]
 
-headers = ['time', 'eta1', 'eta2', 'eta3', 'eta4', 'eta5', 'eta6', 'nu1','nu2','nu3','nu4','nu5','nu6','eta_d_1', 'eta_d_2', 'eta_d_6', 'nu_d_1','nu_d_2','nu_d_6', 'y1','y2','y3','y4','y5','y6',
-           'tau_cmd_1','tau_cmd_2','tau_cmd_6', 'tau_w_1', 'tau_w_2','tau_w_3','tau_w_4','tau_w_5','tau_w_6', 'xi_hat_1', 'xi_hat_2','xi_hat_3','xi_hat_4','xi_hat_5','xi_hat_6', 
-           'eta_hat_1', 'eta_hat_2', 'eta_hat_6', 'bias_hat_1', 'bias_hat_2', 'bias_hat_6', 'nu_hat_1', 'nu_hat_2', 'nu_hat_6', 'eta_ref_1','eta_ref_2','eta_ref_6', 
-           'bias_ctrl_1','bias_ctrl_2','bias_ctrl_6', 'tau_ctrl_1', 'tau_ctrl_2', 'tau_ctrl_6', 'time_ctrl', 'tau_w_first_1','tau_w_first_2','tau_w_first_3','tau_w_first_4',
-           'tau_w_first_5','tau_w_first_6', 'tau_w_second_1','tau_w_second_2','tau_w_second_3','tau_w_second_4', 'tau_w_second_5','tau_w_second_6', 'u1','u2','u3','u4','u5',
-           'u6','zeta']
-for i in range(N_theta):
-    headers.append('theta_hat_'+str(i+1))
-
-
-# Create dataframe
-df = pd.DataFrame(storage, columns=headers)
-# Convert to csv
-df.to_csv('test.csv')
-
-
-
-'''
 fig, axs = plt.subplots(2, 3)
 i_obs=0
 for i in range(2):
