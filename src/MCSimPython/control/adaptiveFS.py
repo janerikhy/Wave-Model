@@ -142,8 +142,12 @@ class AdaptiveFSController():
             - N: Number of components
         '''
         self._N = N
-        dw = (w_max-w_min)/ self._N
-        self._freqs = np.arange(w_min, w_max, dw)
+        try:
+            dw = (w_max-w_min)/ self._N
+            self._freqs = np.arange(w_min, w_max, dw)
+        except ZeroDivisionError:
+            self._freqs = np.array([])
+            
 
     def set_tuning_params(self, K1: list, K2: list, gamma: float):
         self._K1 = np.diag(K1)
