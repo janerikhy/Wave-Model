@@ -12,7 +12,7 @@
 # ---------------------------------------------------------------------------
 
 import numpy as np
-from MCSimPython.utils import Rz
+from MCSimPython.utils import Rz, pipi
 
 
 class PD:
@@ -43,6 +43,7 @@ class PD:
         """
         psi = eta[-1]
         z1 = Rz(psi).T@(eta-eta_d)
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d
         return -self.Kp@z1 - self.Kd@z2
     
@@ -85,9 +86,11 @@ class PID:
         """
         psi = eta[-1]
         z1 = Rz(psi).T@(eta - eta_d)
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d
 
-        self.zi += self.dt*(eta - eta_d)
+        self.zi[:2] += self.dt*(eta[:2] - eta_d[:2])
+        self.zi[2] += self.dt*pipi(eta[2] - eta_d[2])
         return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
 
 
@@ -118,6 +121,7 @@ class DirectBiasCompensationController():
         '''
         psi = eta[-1]
         z1 = Rz(psi).T@(eta-eta_d)              # P
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d                          # D
         zb = Rz(psi).T@b                        # bias
         return -self.Kp@z1 - self.Kd@z2 - zb
