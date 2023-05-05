@@ -138,8 +138,8 @@ jonswap = JONSWAP(w)
 _, spectrum = jonswap(hs, tp, gamma=3.3)
 
 wave_amps = np.sqrt(2*spectrum*dw)
-wave_angle = -np.pi*np.ones(N)
-# wave_angle = np.random.normal(np.pi/2, np.pi/8/3, size=N)  # Waves with some spreading, going West
+wave_angle = -np.pi*2/3*np.ones(N)
+wave_angle = np.random.normal(-np.pi*2/3, np.pi/3/3, size=N)  # Waves with some spreading, going West
 eps = np.random.uniform(0, 2*np.pi, size=N)
 
 waveload = WaveLoad(
@@ -163,7 +163,7 @@ fig, ax = plt.subplots(subplot_kw=dict(projection="3d"), figsize=(12, 12))
 hps = np.ix_([0, 1, 2], [0, 1, 2])
 ls = LightSource(azdeg=0, altdeg=60)
 
-vessel.set_eta(np.array([17., 0., 0., 0., 0., 0.]))
+vessel.set_eta(np.array([21., 25., 0., 0., 0., 0.]))
 
 # Simulate vessel for some seconds to remove transients
 time_prior = np.arange(-100, 0, dt)
@@ -171,7 +171,7 @@ for i in range(time_prior.size):
     tau_wf = waveload.first_order_loads(time_prior[i], vessel.get_eta())
     vessel.integrate(0., 0., tau_wf)
 
-with writer.saving(fig, os.path.join(os.path.dirname(__file__),"vessel_motion3d__rvg_waveangle_180.gif"), 100):
+with writer.saving(fig, os.path.join(os.path.dirname(__file__),"vessel_motion3d__rvg_waveangle_120_spreading.gif"), 100):
     for j, t in enumerate(time):
 
         # tau_wf = waveload.first_order_loads(t, vessel.get_eta())
