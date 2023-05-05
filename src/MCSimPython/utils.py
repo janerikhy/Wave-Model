@@ -549,6 +549,16 @@ def read_hydrod(filepath):
     LCG, VCG = data2num(run_info[2])
     version, *_ = data2int(run_info[3])
     print(f"Version = {version}")
+    
+    # Gravity vector in body-fixed frame
+    r_g = np.array([-LCG, 0, 0])
+    
+    # Transformation matrices
+    T = np.diag([-1, 1, -1, -1, 1, -1])
+    H = np.block([
+        [np.eye(3), Smat(r_g).T],
+        [np.zeros((3, 3)), np.eye(3)]
+    ])
 
     novel, nohead, nofreq, nodof = data2int(f.readline())
 
@@ -601,9 +611,23 @@ def read_hydrod(filepath):
                 Bv44_nonlin[j, h, v] = bv_nl
                 Bv44_linearized[j, h, v] = bv_ll
     
-
+    # TODO: Transform the hydrodynamic coefficients to body-fixed frame.
     f.close()
-    return Mrb, A, B, C, Bv44_linear, Bv44_nonlin, Bv44_linearized
+    
+    # Transforming coefficients from CG to CO and from from Veres to MCSimPython axis system.
+    Mrb_co = H.T@T@Mrb@T@H
+    
+    A_co = np.zeros_like(A)
+    B_co = np.zeros_like(B)
+    C_co = np.zeros_like(C)
+    
+    for v in range(novel):
+        for f in range(nofreq):
+            A_co[:, :, f, v] = H.T@T@A[:, :, f, v]@T@H
+            B_co[:, :, f, v] = H.T@T@B[:, :, f, v]@T@H
+            C_co[:, :, f, v] = H.T@T@C[:, :, f, v]@T@H
+    
+    return Mrb_co, A_co, B_co, C_co, Bv44_linear, Bv44_nonlin, Bv44_linearized
 
 
 def read_wave_drift(filepath):
