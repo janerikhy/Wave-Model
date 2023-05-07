@@ -5,6 +5,7 @@
 # Created By: Jan-Erik Hygen
 # Created Date: 2022-10-12
 # Revised: 2023-02-09 Harald Mo    Add from/to 6 and 3DOF functions
+#          2023-05-07 Jan-Erik Hygen add fluid memory estimation
 # 
 # Tested:  See tests/test_utils.py
 # 
@@ -19,6 +20,10 @@ import matplotlib.pyplot as plt
 import re
 import os
 import json
+
+from scipy.signal import TransferFunction
+from scipy.optimize import least_squares
+
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
 dof3_array = np.ix_([0, 1, 5])
@@ -889,3 +894,216 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     # Add some saving method here.
     
     
+    
+# ---------- FLUID MEMEORY EFFECT ESTIMATION ------------
+
+# This can maybe be set in a separate file.
+
+def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=20):
+    """
+    Estimate the numerator and denominator coefficients of a transfer function from
+    frequency response data using complex function curve fitting with quasi-linear least squares.
+
+    Parameters
+    ----------
+    h : array_like
+        The frequency response values.
+    w : array_like
+        The frequencies (in radians/sample) corresponding to the frequency response values.
+    nb : int
+        The order of the numerator.
+    na : int
+        The order of the denominator.
+    weights : array_like, optional
+        The weighting factors for the frequency response values. Default is None.
+
+    Returns
+    -------
+    b : ndarray
+        The estimated numerator coefficients of the transfer function.
+    a : ndarray
+        The estimated denominator coefficients of the transfer function.
+    success : bool
+        True if the fit succeeded, False otherwise.
+    """
+
+    # Check input arguments
+    h = np.asarray(h, dtype=complex)
+    w = np.asarray(w, dtype=float)
+    if len(h) != len(w):
+        raise ValueError("h and w must have the same length")
+    if nb <= 0:
+        raise ValueError("nb must be a positive integer")
+    if na <= 0:
+        raise ValueError("na must be a positive integer")
+
+    # Define the transfer function numerator and denominator functions
+    def transfer_function(w, b, a):
+        return np.polyval(b[::-1], 1j * w) / np.polyval(a[::-1], 1j * w)
+
+    # Define the objective function
+    def fun_residuals(params, w, h, weights):
+        b = params[:nb]
+        a = params[nb:]
+        ypred = transfer_function(w, b, a)
+        residuals = np.concatenate([np.real(ypred - h), np.imag(ypred - h)])
+        if weights is not None:
+            weights = np.asarray(weights)
+            weights = np.repeat(weights, 2)
+            residuals *= np.sqrt(weights)
+        return residuals
+
+    # Initialize the coefficients
+    # p0 = np.random.randn(nb + na)
+    p0 = np.ones(nb + na)
+
+    # Perform the quasi-linear least squares fitting
+
+    result = least_squares(fun_residuals, p0, args=(w, h, weights), loss='soft_l1')
+    if method==2:
+        print(f"Using iterative method.")
+        weights = np.ones_like(w)
+        for i in range(maxiter):
+            result = least_squares(fun_residuals, result.x, args=(w, h, weights), loss='soft_l1')
+            # weights = 1 / np.abs(transfer_function(w, result.x[:nb], result.x[nb:]))
+            weights = 1 / np.abs(np.polyval(result.x[nb:][::-1], 1j * w))**2
+
+    return result.x[:nb], result.x[nb:], result.success
+
+
+def joint_identification(w, A, B, order, plot_estimate=False, method=0):
+    """Joint identification of infinity added mass and radiation forces.
+    
+    Parameters
+    ----------
+    w : array_like
+        The frequencies (in radians/sample) corresponding to the frequency response values.
+    A : array_like
+        The frequency response values of the added mass.
+    B : array_like
+        The frequency response values of the radiation forces.
+    order : int
+        The order of the numerator and denominator polynomials.
+    plot_estimate : bool, optional
+        If True, plot the estimated transfer function. Default is False.
+    
+    Returns
+    -------
+    Ma : ndarray
+        The estimated infinity added mass coefficients.
+    Arad : array_like
+        The system matrix of the radiation forces.
+    Brad : array_like
+        The input matrix of the radiation forces.
+    Crad : array_like
+        The output matrix of the radiation forces.
+    """
+    
+    # Compute the complex added mass coeficient.
+    Ac = B/(1j * w) + A
+    
+    # Scale the frequency response values for better prediction.
+    Ac_scaled = Ac / np.max(np.abs(Ac))
+    
+    num, den, success = invfreqs(Ac_scaled, w, order, order, method=method)
+    if not success:
+        raise ValueError("Least squares fit failed")
+    # Rescale the coefficients.
+    num = num * np.max(np.abs(Ac))
+    
+    As = TransferFunction(num[::-1], den[::-1])
+    Ainf = As.num[0]
+    
+    # The 0th term represent prior knowledge of the transfer function, which should be zero at s=0.
+    Pik = np.concatenate((As.num - Ainf*As.den, [0]))
+    Qik = np.array(As.den)
+    
+    # Compute the estimated transfer function with relative degree 1.
+    H_hat = TransferFunction(Pik[2:], Qik)
+    Kw_hat = H_hat.freqresp(w)[1]
+    
+    Aest = np.imag(Kw_hat)/w + Ainf
+    Best = np.real(Kw_hat)
+    
+    return Ainf, Aest, Best, H_hat
+
+
+def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
+    order = 2
+    treshold = 0.99
+    dofs = np.array([
+        # [0, 0],
+        [1, 1],
+        [1, 3],
+        [1, 5],
+        [2, 2],
+        [2, 4],
+        [3, 3],
+        [3, 5],
+        [4, 4],
+        [5, 5]
+    ])
+    
+    MA = np.zeros((6, 6))
+    
+    for dof_ik in dofs:
+        a = A[dof_ik[0], dof_ik[1], :]
+        b = B[dof_ik[0], dof_ik[1], :]
+        sucess = False
+        while not sucess:
+            try:
+                a_inf_ik, a_est_ik, b_est_ik, kw_est_ik = joint_identification(w, a, b, order, method=method, plot_estimate=plot_estimate)
+                # Compute some values to check if the fit is good.
+                sseb = np.sum((b - b_est_ik)**2)
+                sstb = np.sum((b - np.mean(b))**2)
+                rsqrb = 1 - sseb/sstb
+                
+                ssea = np.sum((a - a_est_ik)**2)
+                ssta = np.sum((a - np.mean(a))**2)
+                rsqra = 1 - ssea/ssta
+                
+                if (rsqrb > treshold) and (rsqra > treshold):
+                    sucess = True
+                    print(f"Joint identification successful for {dof_ik}. Order = {order}.")
+                    MA[dof_ik[0], dof_ik[1]] = a_inf_ik
+                    if dof_ik[0] != dof_ik[1]:
+                        MA[dof_ik[1], dof_ik[0]] = a_inf_ik
+                        
+                    if plot_estimate:
+                        wmin = np.min(w)*.1
+                        wmax = 10
+                        w_new = np.arange(wmin, wmax+0.01, 0.01)
+                        Kw_hat_n = kw_est_ik.freqresp(w_new)[1]
+                        Aest_n = np.imag(Kw_hat_n)/w_new + a_inf_ik
+                        Best_n = np.real(Kw_hat_n)
+                        fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
+                        fig.suptitle(f"Joint identification of DOF {dof_ik+1} with order {order}")
+                        plt.sca(ax[0])
+                        plt.title("Estimated added mass")
+                        plt.plot(w, a, 'o', label='A')
+                        plt.plot(w_new, Aest_n, '-', label='Aest')
+                        plt.legend()
+                        
+                        plt.sca(ax[1])
+                        plt.title("Estimated damping")
+                        plt.plot(w, b, 'o', label='B')
+                        plt.plot(w_new, Best_n, '-', label='Best')
+                        plt.legend()
+                        
+                        plt.show()
+                if order > max_order:
+                    break
+                else:
+                    order += 1
+                    
+            except ValueError:
+                print(f"Joint identification failed for {dof_ik}. Using order {order+1} instead.")
+                order += 1
+                if order > max_order:
+                    print(f"Order exceeded maximum order {max_order}.")
+                    break
+                continue
+        order = 2
+        sucess = False
+        
+    return MA
