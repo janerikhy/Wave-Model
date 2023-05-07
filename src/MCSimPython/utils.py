@@ -581,6 +581,8 @@ def read_hydrod(filepath):
     for i in range(nodof):
         Mrb[i] = [m for m in data2num(f.readline())]
 
+    nabla = float(Mrb[0, 0]/rhow)
+
     for v in range(novel):
         vel, *_ = data2float(f.readline())
         for h in range(nohead):
@@ -616,7 +618,6 @@ def read_hydrod(filepath):
                 Bv44_nonlin[j, h, v] = bv_nl
                 Bv44_linearized[j, h, v] = bv_ll
     
-    # TODO: Transform the hydrodynamic coefficients to body-fixed frame.
     f.close()
     
     # Transforming coefficients from CG to CO and from from Veres to MCSimPython axis system.
@@ -632,7 +633,7 @@ def read_hydrod(filepath):
             B_co[:, :, f, v] = H.T@T@B[:, :, f, v]@T@H
             C_co[:, :, f, v] = H.T@T@C[:, :, f, v]@T@H
     
-    return Mrb_co, A_co, B_co, C_co, Bv44_linear, Bv44_nonlin, Bv44_linearized
+    return Mrb_co, A_co, B_co, C_co, Bv44_linear, Bv44_nonlin, Bv44_linearized, nabla, rhow, lpp
 
 
 def read_wave_drift(filepath):
@@ -854,11 +855,19 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     print("Read wave drift data (.re2)...")
     drift_frc = read_wave_drift(re2)
     print("Read hydrodynamic parameters (.re7)...")
-    Mrb, A, B, C, Bv44_lin, Bv44_nonlin, Bv44_linearized = read_hydrod(re7)
+    Mrb, A, B, C, Bv44_lin, Bv44_nonlin, Bv44_linearized, nabla, rhow, lpp = read_hydrod(re7)
     print("COMPLETE".center(100, '.'))
     # Functions for reading the other files
-        ## ADD FUNCTIONS HERE
+    
+    # Add hydrodynamic data for surge. Based on Søding (1982)
+    A11_0 = 2.7*(rhow/lpp**2)*nabla**(5/3)
+    A22_0 = A[1, 1, 0, 0]
+    alpha = A11_0/A22_0
+    A[0, 0] = alpha*A[1, 1]
+    B[1, 1] = alpha*B[1, 1]
+    
     # Add the inputs to dictionary.
+    vessel_config['main'] = {'lpp': lpp, 'nabla': nabla, 'rhow': rhow}
     vessel_config['freqs'] = freqs.tolist()
     vessel_config['headings'] = headings.tolist()
     vessel_config['velocity'] = vels.tolist()
@@ -879,8 +888,8 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     vessel_config['Bv44']['Nonlin'] = Bv44_nonlin.tolist()
     vessel_config['Bv44']['Linearized'] = Bv44_linearized.tolist()
     Bv = np.zeros((6, 6))
-    # Bv[3, 3] = Bv44_linearized
-    vessel_config['Bv'] = np.zeros((6, 6)).tolist()   # Should add some viscous damping estimates here.
+    Bv[3, 3] = Bv44_lin[0, 0, 0]
+    vessel_config['Bv'] = Bv.tolist()   # Should add some viscous damping estimates here.
 
     if headings.size <= 19:
         print(f"VERES results only for heading {np.min(headings)} to {np.max(headings)}. ")
@@ -891,7 +900,6 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     
     
     return vessel_config
-    # Add some saving method here.
     
     
     
@@ -1024,6 +1032,9 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     
     Aest = np.imag(Kw_hat)/w + Ainf
     Best = np.real(Kw_hat)
+    
+    # TODO: Check for positive roots of the denominator. If roots are positive, the roots must be flipped sign to
+    #      obtain a stable system.
     
     return Ainf, Aest, Best, H_hat
 
