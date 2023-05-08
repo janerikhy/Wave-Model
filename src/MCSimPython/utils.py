@@ -978,6 +978,29 @@ def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=20):
 
     return result.x[:nb], result.x[nb:], result.success
 
+def _stabilize(a):
+    """Stabilize the denominator polynomial by switching sign of real part for roots with real part > 1.
+    
+    Parameters
+    ----------
+    a : array_like
+        The denominator polynomial coefficients.
+    
+    Returns
+    -------
+    a : ndarray
+        The stabilized denominator polynomial coefficients.
+    """
+    # Find the roots of the denominator polynomial
+    r = np.roots(a)
+    
+    # Switch sign of real part for roots with real part > 1
+    r = np.where(np.real(r) > 0, -r, r)
+    
+    # Compute the stabilized denominator polynomial
+    return np.poly(r)
+    
+    
 
 def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     """Joint identification of infinity added mass and radiation forces.
@@ -1016,6 +1039,8 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     num, den, success = invfreqs(Ac_scaled, w, order, order, method=method)
     if not success:
         raise ValueError("Least squares fit failed")
+    if np.any(np.roots(den[::-1]) > 0):
+        print("WARNING: The estimated denominator has positive roots.")
     # Rescale the coefficients.
     num = num * np.max(np.abs(Ac))
     
@@ -1024,7 +1049,7 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     
     # The 0th term represent prior knowledge of the transfer function, which should be zero at s=0.
     Pik = np.concatenate((As.num - Ainf*As.den, [0]))
-    Qik = np.array(As.den)
+    Qik = np.array(_stabilize(As.den))
     
     # Compute the estimated transfer function with relative degree 1.
     H_hat = TransferFunction(Pik[2:], Qik)
@@ -1032,6 +1057,24 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     
     Aest = np.imag(Kw_hat)/w + Ainf
     Best = np.real(Kw_hat)
+    
+    if plot_estimate:
+        fig, ax = plt.subplots(2, 1)
+        plt.sca(ax[0])
+        plt.title(f"roots(Qik) = {np.roots(Qik)}")
+        plt.plot(w, np.abs(Ac), label="Ac")
+        plt.plot(w, np.abs(As.freqresp(w)[1]), label="As")
+        plt.xlabel("Frequency [rad/s]")
+        plt.ylabel("Magnitude")
+        plt.legend()
+        
+        plt.sca(ax[1])
+        plt.plot(w, np.angle(Ac), label="Ac")
+        plt.plot(w, np.angle(As.freqresp(w)[1]), label="As")
+        plt.xlabel("Frequency [rad/s]")
+        plt.ylabel("Phase [rad]")
+        plt.legend()
+        plt.show()
     
     # TODO: Check for positive roots of the denominator. If roots are positive, the roots must be flipped sign to
     #      obtain a stable system.
@@ -1087,6 +1130,13 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                         Kw_hat_n = kw_est_ik.freqresp(w_new)[1]
                         Aest_n = np.imag(Kw_hat_n)/w_new + a_inf_ik
                         Best_n = np.real(Kw_hat_n)
+                        plt.figure()
+                        plt.title("Complex curve fit")
+                        plt.plot(w_new, np.abs(Kw_hat_n), '-', label='|Kw_hat|')
+                        plt.plot(w, np.abs(b + 1j*w*(a-a_inf_ik)), 'o', label='|Kw|')
+                        plt.legend()
+                        plt.show()
+                        
                         fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
                         fig.suptitle(f"Joint identification of DOF {dof_ik+1} with order {order}")
                         plt.sca(ax[0])
