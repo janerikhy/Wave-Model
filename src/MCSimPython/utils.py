@@ -907,7 +907,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
 
 # This can maybe be set in a separate file.
 
-def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=20):
+def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=40):
     """
     Estimate the numerator and denominator coefficients of a transfer function from
     frequency response data using complex function curve fitting with quasi-linear least squares.
@@ -962,8 +962,8 @@ def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=20):
         return residuals
 
     # Initialize the coefficients
-    # p0 = np.random.randn(nb + na)
-    p0 = np.ones(nb + na)
+    p0 = np.random.randn(nb + na)
+    # p0 = np.ones(nb + na)
 
     # Perform the quasi-linear least squares fitting
 
@@ -973,10 +973,37 @@ def invfreqs(h, w, nb, na, weights=None, method=0, maxiter=20):
         weights = np.ones_like(w)
         for i in range(maxiter):
             result = least_squares(fun_residuals, result.x, args=(w, h, weights), loss='soft_l1')
-            # weights = 1 / np.abs(transfer_function(w, result.x[:nb], result.x[nb:]))
-            weights = 1 / np.abs(np.polyval(result.x[nb:][::-1], 1j * w))**2
+            # weights = 1 / np.abs(transfer_function(w, result.x[:nb], result.x[nb:]))**2
+            weights = np.abs(np.polyval(_stabilize(result.x[nb:][::-1]), 1j * w))**2
 
     return result.x[:nb], result.x[nb:], result.success
+
+
+def _invfreqs_alt(g, worN, nB, nA, wf=None, nk=0):
+    g = np.atleast_1d(g)
+    worN = np.atleast_1d(worN)
+    if wf is None:
+        wf = np.ones_like(worN)
+    if len(g)!=len(worN) or len(worN)!=len(wf):
+        raise ValueError("The lengths of g, worN and wf must coincide.")
+    if np.any(worN<0):
+        raise ValueError("worN has negative values.")
+    s = 1j*worN
+
+    # Constraining B(s) with nk trailing zeros
+    nm = np.maximum(nA, nB+nk)
+    mD = np.vander(1j*worN, nm+1)
+    mH = np.mat(np.diag(g))
+    mM = np.mat(np.hstack(( mH*np.mat(mD[:,-nA:]),\
+            -np.mat(mD[:,-nk-nB-1:][:,:nB+1]))))
+    mW = np.mat(np.diag(wf))
+    Y = np.linalg.solve(np.real(mM.H*mW*mM), -np.real(mM.H*mW*mH*np.mat(mD)[:,-nA-1]))
+    a = np.ones(nA+1)
+    a[1:] = Y[:nA].flatten()
+    b = np.zeros(nB+nk+1)
+    b[:nB+1] = Y[nA:].flatten()
+
+    return b,a
 
 def _stabilize(a):
     """Stabilize the denominator polynomial by switching sign of real part for roots with real part > 1.
@@ -1037,9 +1064,17 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     Ac_scaled = Ac / np.max(np.abs(Ac))
     
     num, den, success = invfreqs(Ac_scaled, w, order, order, method=method)
+    # num, den = _invfreqs_alt(Ac_scaled, w, order, order, wf=None)
+    # success = True
+    # if method == 2:
+    #     for i in range(40):
+    #         weights = 1/np.abs(np.polyval(den, 1j*w))**2
+    #         num, den = _invfreqs_alt(Ac_scaled, w, order, order, wf=weights)
+    # num = num[::-1]
+    # den = den[::-1]
     if not success:
         raise ValueError("Least squares fit failed")
-    if np.any(np.roots(den[::-1]) > 0):
+    if np.any(np.real(np.roots(den[::-1])) > 0):
         print("WARNING: The estimated denominator has positive roots.")
     # Rescale the coefficients.
     num = num * np.max(np.abs(Ac))
@@ -1059,22 +1094,37 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     Best = np.real(Kw_hat)
     
     if plot_estimate:
-        fig, ax = plt.subplots(2, 1)
-        plt.sca(ax[0])
-        plt.title(f"Re (roots(Qik)) = {np.real(np.roots(Qik)):.2f}")
-        plt.plot(w, np.abs(Ac), label="Ac")
-        plt.plot(w, np.abs(As.freqresp(w)[1]), label="As")
+        w_new = np.arange(w.min()*0.1, 10.01, 0.01)
+        fig, ax = plt.subplots(2, 2, constrained_layout=True)
+        plt.sca(ax[0, 0])
+        plt.title(f"Re (roots(As)) = {np.real(np.roots(As.den))}")
+        plt.plot(w, np.abs(Ac), 'o', label="Ac")
+        plt.plot(w_new, np.abs(As.freqresp(w_new)[1]), label="As")
         plt.xlabel("Frequency [rad/s]")
         plt.ylabel("Magnitude")
         plt.legend()
         
-        plt.sca(ax[1])
-        plt.plot(w, np.angle(Ac), label="Ac")
-        plt.plot(w, np.angle(As.freqresp(w)[1]), label="As")
+        plt.sca(ax[1, 0])
+        plt.plot(w, np.angle(Ac), 'o', label="Ac")
+        plt.plot(w_new, np.angle(As.freqresp(w_new)[1]), label="As")
         plt.xlabel("Frequency [rad/s]")
         plt.ylabel("Phase [rad]")
         plt.legend()
+        
+        Kw_hat_new = H_hat.freqresp(w_new)[1]
+        plt.sca(ax[0, 1])
+        plt.plot(w, A, 'o', label="A")
+        plt.plot(w_new, (np.imag(Kw_hat_new/w_new) + Ainf), label="Aest")
+        plt.legend()
+        plt.xlabel("Frequency [rad/s]")
+        
+        plt.sca(ax[1, 1])
+        plt.plot(w, B, 'o', label="B")
+        plt.plot(w_new, (np.real(Kw_hat_new)), label="Best")
+        plt.legend()
+        plt.xlabel("Frequency [rad/s]")
         plt.show()
+        
     
     # TODO: Check for positive roots of the denominator. If roots are positive, the roots must be flipped sign to
     #      obtain a stable system.
@@ -1086,7 +1136,7 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
     order = 2
     treshold = 0.99
     dofs = np.array([
-        # [0, 0],
+        [0, 0],
         [1, 1],
         [1, 3],
         [1, 5],
@@ -1099,13 +1149,20 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
     ])
     
     MA = np.zeros((6, 6))
+    Ar = [[[]]*6]*6
+    Br = [[[]]*6]*6
+    Cr = [[[]]*6]*6
     
     for dof_ik in dofs:
         a = A[dof_ik[0], dof_ik[1], :]
         b = B[dof_ik[0], dof_ik[1], :]
         sucess = False
+        print(f"Running estimation for dof {dof_ik+1}")
         while not sucess:
             try:
+                if np.sum(a) == 0.:
+                    print("a is zero")
+                    break
                 a_inf_ik, a_est_ik, b_est_ik, kw_est_ik = joint_identification(w, a, b, order, method=method, plot_estimate=plot_estimate)
                 # Compute some values to check if the fit is good.
                 sseb = np.sum((b - b_est_ik)**2)
@@ -1115,14 +1172,22 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                 ssea = np.sum((a - a_est_ik)**2)
                 ssta = np.sum((a - np.mean(a))**2)
                 rsqra = 1 - ssea/ssta
-                if (dof_ik[0] == 2) and (dof_ik[1] == 2):
-                    print(f"rsqrb = {rsqrb:.2f}, rsqra = {rsqra:.2f}")
-                if (rsqrb > treshold) and (rsqra > treshold):
+                if (dof_ik[0] == 2) or (dof_ik[0] == 4):
+                    print(f"rsqrb = {rsqrb:.3f}, rsqra = {rsqra:.3f}")
+                if (rsqrb >= treshold) and (rsqra >= treshold):
                     sucess = True
-                    print(f"Joint identification successful for {dof_ik}. Order = {order}.")
+                    print(f"Joint identification successful for DOF {dof_ik+1}. Order = {order}.")
                     MA[dof_ik[0], dof_ik[1]] = a_inf_ik
+                    Krad = kw_est_ik.to_ss()
+                    Ar[dof_ik[0]][dof_ik[1]] = Krad.A
+                    Br[dof_ik[0]][dof_ik[1]] = Krad.B
+                    Cr[dof_ik[0]][dof_ik[1]] = Krad.C
+                    
                     if dof_ik[0] != dof_ik[1]:
                         MA[dof_ik[1], dof_ik[0]] = a_inf_ik
+                        Ar[dof_ik[1]][dof_ik[0]] = Krad.A
+                        Br[dof_ik[1]][dof_ik[0]] = Krad.B
+                        Cr[dof_ik[1]][dof_ik[0]] = Krad.C
                         
                     if plot_estimate:
                         wmin = np.min(w)*.1
@@ -1141,20 +1206,75 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                         fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
                         fig.suptitle(f"Joint identification of DOF {dof_ik+1} with order {order}")
                         plt.sca(ax[0])
-                        plt.title("Estimated added mass")
+                        plt.title("Estimated added mass.   rsqra = {:.3f}".format(rsqra))
                         plt.plot(w, a, 'o', label='A')
                         plt.plot(w_new, Aest_n, '-', label='Aest')
                         plt.legend()
                         
                         plt.sca(ax[1])
-                        plt.title("Estimated damping")
+                        plt.title("Estimated damping.   rsqrb = {:.3f}".format(rsqrb))
                         plt.plot(w, b, 'o', label='B')
                         plt.plot(w_new, Best_n, '-', label='Best')
                         plt.legend()
                         
                         plt.show()
                 if order > max_order:
-                    break
+                    cont = input("Order exceeded maximum order. Continue? [y/n] ")
+                    if cont.lower() == "y":
+                        order = int(input("Enter new order (recommended: 2-5): "))
+                    else:
+                        break
+                    print("Evaluate the transfer function and select order manually.")
+                    a_inf_ik, a_est_ik, b_est_ik, kw_est_ik = joint_identification(w, a, b, order, method=method, plot_estimate=plot_estimate)
+                    # Compute some values to check if the fit is good.
+                    sseb = np.sum((b - b_est_ik)**2)
+                    sstb = np.sum((b - np.mean(b))**2)
+                    rsqrb = 1 - sseb/sstb
+                    
+                    ssea = np.sum((a - a_est_ik)**2)
+                    ssta = np.sum((a - np.mean(a))**2)
+                    rsqra = 1 - ssea/ssta
+                    wmin = np.min(w)*.1
+                    wmax = 10
+                    w_new = np.arange(wmin, wmax+0.01, 0.01)
+                    Kw_hat_n = kw_est_ik.freqresp(w_new)[1]
+                    Aest_n = np.imag(Kw_hat_n)/w_new + a_inf_ik
+                    Best_n = np.real(Kw_hat_n)
+                    plt.figure()
+                    plt.title("Complex curve fit")
+                    plt.plot(w_new, np.abs(Kw_hat_n), '-', label='|Kw_hat|')
+                    plt.plot(w, np.abs(b + 1j*w*(a-a_inf_ik)), 'o', label='|Kw|')
+                    plt.legend()
+                    plt.show()
+                    
+                    fig, ax = plt.subplots(1, 2, figsize=(12, 6), constrained_layout=True)
+                    fig.suptitle(f"Joint identification of DOF {dof_ik+1} with order {order}")
+                    plt.sca(ax[0])
+                    plt.title("Estimated added mass.   rsqra = {:.3f}".format(rsqra))
+                    plt.plot(w, a, 'o', label='A')
+                    plt.plot(w_new, Aest_n, '-', label='Aest')
+                    plt.legend()
+                    
+                    plt.sca(ax[1])
+                    plt.title("Estimated damping.   rsqrb = {:.3f}".format(rsqrb))
+                    plt.plot(w, b, 'o', label='B')
+                    plt.plot(w_new, Best_n, '-', label='Best')
+                    plt.legend()
+                    
+                    plt.show()
+                    yn = input("If the fit is good, enter 'y' to continue. Otherwise, enter 'n' to run a different order. ")
+                    if yn.lower() == 'y':
+                        sucess = True
+                        print(f"Joint identification successful for DOF {dof_ik+1}. Order = {order}.")
+                        MA[dof_ik[0], dof_ik[1]] = a_inf_ik
+                        SS = kw_est_ik.to_ss()
+                        
+
+                        if dof_ik[0] != dof_ik[1]:
+                            MA[dof_ik[1], dof_ik[0]] = a_inf_ik
+                    else:
+                        order = max_order
+                        
                 else:
                     order += 1
                     
@@ -1162,10 +1282,13 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                 print(f"Joint identification failed for {dof_ik}. Using order {order+1} instead.")
                 order += 1
                 if order > max_order:
-                    print(f"Order exceeded maximum order {max_order}.")
-                    break
+                    cont = input("Order exceeded maximum order. Continue? [y/n] ")
+                    if cont.lower() == "y":
+                        order = int(input("Enter new order (recommended: 2-5): "))
+                    else:
+                        break
                 continue
         order = 2
         sucess = False
         
-    return MA
+    return MA, Ar, Br, Cr
