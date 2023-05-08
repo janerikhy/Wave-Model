@@ -864,7 +864,7 @@ def generate_config_file(input_files_paths: list = None, input_file_dir: str = N
     A22_0 = A[1, 1, 0, 0]
     alpha = A11_0/A22_0
     A[0, 0] = alpha*A[1, 1]
-    B[1, 1] = alpha*B[1, 1]
+    B[0, 0] = alpha*B[1, 1]
     
     # Add the inputs to dictionary.
     vessel_config['main'] = {'lpp': lpp, 'nabla': nabla, 'rhow': rhow}
