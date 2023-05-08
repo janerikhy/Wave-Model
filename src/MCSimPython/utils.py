@@ -1061,7 +1061,7 @@ def joint_identification(w, A, B, order, plot_estimate=False, method=0):
     if plot_estimate:
         fig, ax = plt.subplots(2, 1)
         plt.sca(ax[0])
-        plt.title(f"roots(Qik) = {np.roots(Qik)}")
+        plt.title(f"Re (roots(Qik)) = {np.real(np.roots(Qik)):.2f}")
         plt.plot(w, np.abs(Ac), label="Ac")
         plt.plot(w, np.abs(As.freqresp(w)[1]), label="As")
         plt.xlabel("Frequency [rad/s]")
@@ -1115,7 +1115,8 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                 ssea = np.sum((a - a_est_ik)**2)
                 ssta = np.sum((a - np.mean(a))**2)
                 rsqra = 1 - ssea/ssta
-                
+                if (dof_ik[0] == 2) and (dof_ik[1] == 2):
+                    print(f"rsqrb = {rsqrb:.2f}, rsqra = {rsqra:.2f}")
                 if (rsqrb > treshold) and (rsqra > treshold):
                     sucess = True
                     print(f"Joint identification successful for {dof_ik}. Order = {order}.")
