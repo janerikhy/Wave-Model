@@ -149,8 +149,12 @@ class AdaptiveFSController():
             self._freqs = np.array([])
             
 
-    def set_tuning_params(self, K1: list, K2: list, gamma: float):
+    def set_tuning_params(self, K1: list, K2: list, gamma: list):
         self._K1 = np.diag(K1)
         self._K2 = np.diag(K2)
-        self._gamma = np.eye((2*self._N +1)*3) * gamma
+        #self._gamma = np.eye((2*self._N +1)*3) * gamma
+        if len(gamma) != (2*self._N +1)*3:
+            raise ValueError
+        self._gamma = np.diag(gamma)
+
 
