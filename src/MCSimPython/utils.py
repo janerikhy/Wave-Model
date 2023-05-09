@@ -1172,8 +1172,6 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                 ssea = np.sum((a - a_est_ik)**2)
                 ssta = np.sum((a - np.mean(a))**2)
                 rsqra = 1 - ssea/ssta
-                if (dof_ik[0] == 2) or (dof_ik[0] == 4):
-                    print(f"rsqrb = {rsqrb:.3f}, rsqra = {rsqra:.3f}")
                 if (rsqrb >= treshold) and (rsqra >= treshold):
                     sucess = True
                     print(f"Joint identification successful for DOF {dof_ik+1}. Order = {order}.")
@@ -1219,7 +1217,8 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                         
                         plt.show()
                 if order > max_order:
-                    cont = input("Order exceeded maximum order. Continue? [y/n] ")
+                    print("Could not find a good fit for order less than max_order = {}.".format(max_order))
+                    cont = input("Would you like to manually find best fit? [y/n] ")
                     if cont.lower() == "y":
                         order = int(input("Enter new order (recommended: 2-5): "))
                     else:
@@ -1273,7 +1272,7 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                         if dof_ik[0] != dof_ik[1]:
                             MA[dof_ik[1], dof_ik[0]] = a_inf_ik
                     else:
-                        order = max_order
+                        order = max_order + 1
                         
                 else:
                     order += 1
