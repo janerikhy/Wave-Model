@@ -483,7 +483,7 @@ class FluidMemory:
         xr = [np.zeros(dim[0]) for dim in dimensions if len(dim) > 1]
         indices = [i for i, dim in enumerate(dimensions) if len(dim) > 1]
         Ar = [np.asarray(self._Ar_lst[ind]) for ind in indices]
-        Br = [np.asarray(self._Br_lst[ind]) for ind in indices]
+        Br = [np.asarray(self._Br_lst[ind]).reshape(-1,) for ind in indices]
         Cr = [np.asarray(self._Cr_lst[ind]) for ind in indices]
         return xr, Ar, Br, Cr, indices
     
