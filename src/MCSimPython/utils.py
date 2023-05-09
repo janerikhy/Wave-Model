@@ -1163,7 +1163,7 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                 if np.sum(a) == 0.:
                     print("a is zero")
                     break
-                a_inf_ik, a_est_ik, b_est_ik, kw_est_ik = joint_identification(w, a, b, order, method=method, plot_estimate=plot_estimate)
+                a_inf_ik, a_est_ik, b_est_ik, kw_est_ik = joint_identification(w, a, b, order, method=method, plot_estimate=False)
                 # Compute some values to check if the fit is good.
                 sseb = np.sum((b - b_est_ik)**2)
                 sstb = np.sum((b - np.mean(b))**2)
@@ -1179,15 +1179,15 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                     print(f"Joint identification successful for DOF {dof_ik+1}. Order = {order}.")
                     MA[dof_ik[0], dof_ik[1]] = a_inf_ik
                     Krad = kw_est_ik.to_ss()
-                    Ar[dof_ik[0]][dof_ik[1]] = Krad.A
-                    Br[dof_ik[0]][dof_ik[1]] = Krad.B
-                    Cr[dof_ik[0]][dof_ik[1]] = Krad.C
+                    Ar[dof_ik[0]][dof_ik[1]] = Krad.A.tolist()
+                    Br[dof_ik[0]][dof_ik[1]] = Krad.B.tolist()
+                    Cr[dof_ik[0]][dof_ik[1]] = Krad.C.tolist()
                     
                     if dof_ik[0] != dof_ik[1]:
                         MA[dof_ik[1], dof_ik[0]] = a_inf_ik
-                        Ar[dof_ik[1]][dof_ik[0]] = Krad.A
-                        Br[dof_ik[1]][dof_ik[0]] = Krad.B
-                        Cr[dof_ik[1]][dof_ik[0]] = Krad.C
+                        Ar[dof_ik[1]][dof_ik[0]] = Krad.A.tolist()
+                        Br[dof_ik[1]][dof_ik[0]] = Krad.B.tolist()
+                        Cr[dof_ik[1]][dof_ik[0]] = Krad.C.tolist()
                         
                     if plot_estimate:
                         wmin = np.min(w)*.1

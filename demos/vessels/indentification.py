@@ -22,11 +22,17 @@ with np.printoptions(precision=3, suppress=True):
 # Save the data to a configuration file to use it for simulation.
 file_name = "rvg3ABC_config_.json"
 basedir = os.getcwd()
-rvg_dir = os.path.join(basedir, 'src', 'MCSimPython', 'vessels', 'gunnerus')
+rvg_dir = os.path.join(basedir, 'src', 'MCSimPython', 'vessel_data', 'gunnerus')
 
 vesselABC = {}
-vesselABC['Ar'] = Ar
-vesselABC['Br'] = Br
-vesselABC['Cr'] = Cr
+vesselABC['Ar'] = sum(Ar, [])   # Flatten the list of lists (as in MATLAB)
+vesselABC['Br'] = sum(Br, [])
+vesselABC['Cr'] = sum(Cr, [])
 vesselABC['MA'] = MA.tolist()
+vesselABC['MRB'] = np.asarray(config['MRB']).tolist()
+vesselABC['G'] = np.asarray(config['C'])[:, :, 0, 0].tolist()
+
 vesselABC['freqs'] = w.tolist()
+
+with open(os.path.join(rvg_dir, file_name), 'w') as f:
+    json.dump(vesselABC, f)
