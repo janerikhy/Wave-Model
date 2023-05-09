@@ -1149,9 +1149,13 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
     ])
     
     MA = np.zeros((6, 6))
-    Ar = [[[]]*6]*6
-    Br = [[[]]*6]*6
-    Cr = [[[]]*6]*6
+    # Ar = [[[]]*6]*6
+    # Br = [[[]]*6]*6
+    # Cr = [[[]]*6]*6
+    Ar = [list(range(1 + 6 * i, 1 + 6 * (i + 1))) for i in range(6)]
+    Br = [list(range(1 + 6 * i, 1 + 6 * (i + 1))) for i in range(6)]
+    Cr = [list(range(1 + 6 * i, 1 + 6 * (i + 1))) for i in range(6)]
+    
     
     for dof_ik in dofs:
         a = A[dof_ik[0], dof_ik[1], :]
@@ -1266,11 +1270,17 @@ def system_identification(w, A, B, max_order=10, method=0, plot_estimate=False):
                         sucess = True
                         print(f"Joint identification successful for DOF {dof_ik+1}. Order = {order}.")
                         MA[dof_ik[0], dof_ik[1]] = a_inf_ik
-                        SS = kw_est_ik.to_ss()
+                        Krad = kw_est_ik.to_ss()
+                        Ar[dof_ik[0]][dof_ik[1]] = Krad.A.tolist()
+                        Br[dof_ik[0]][dof_ik[1]] = Krad.B.tolist()
+                        Cr[dof_ik[0]][dof_ik[1]] = Krad.C.tolist()
                         
 
                         if dof_ik[0] != dof_ik[1]:
                             MA[dof_ik[1], dof_ik[0]] = a_inf_ik
+                            Ar[dof_ik[1]][dof_ik[0]] = Krad.A.tolist()
+                            Br[dof_ik[1]][dof_ik[0]] = Krad.B.tolist()
+                            Cr[dof_ik[1]][dof_ik[0]] = Krad.C.tolist()
                     else:
                         order = max_order + 1
                         
