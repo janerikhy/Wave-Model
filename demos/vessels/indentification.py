@@ -14,13 +14,13 @@ A = np.asarray(config['A'])[:, :, :, 0]
 B = np.asarray(config['B'])[:, :, :, 0]
 w = np.asarray(config['freqs'])
 
-MA, Ar, Br, Cr = sys_id(w, A, B, max_order=7, method=2, plot_estimate=True)
+MA, Ar, Br, Cr = sys_id(w, A, B, max_order=6, method=2, plot_estimate=True)
 with np.printoptions(precision=3, suppress=True):
     print(MA)
     
     
 # Save the data to a configuration file to use it for simulation.
-file_name = "rvg3ABC_config_.json"
+file_name = "rvg3ABC_config.json"
 basedir = os.getcwd()
 rvg_dir = os.path.join(basedir, 'src', 'MCSimPython', 'vessel_data', 'gunnerus')
 

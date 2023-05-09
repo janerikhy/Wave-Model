@@ -441,8 +441,6 @@ class FluidMemory:
         self.n_systems = len(self._xr)
 
         self.mu = np.zeros(6)
-
-
         
 
     @property
@@ -496,3 +494,9 @@ class FluidMemory:
             self._xr[i] = self._xr[i] + self.dt * xr_dot
             yr[dof] += self._Cr[i]@self._xr[i]
         self.mu = yr
+        
+    def reset(self):
+        for i in range(len(self.indices)):
+            self._xr[i] = np.zeros_like(self._xr[i])
+        self.mu = np.zeros(6)
+        
