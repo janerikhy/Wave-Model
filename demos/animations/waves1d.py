@@ -1,4 +1,5 @@
 import os
+import json
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +9,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from MCSimPython.waves import JONSWAP, WaveLoad
 from MCSimPython.simulator import RVG_DP_6DOF
 from MCSimPython.control.basic import PID
-from MCSimPython.utils import pipi, J, Rz, Ry, Rx, Rzyx
+from MCSimPython.utils import pipi, J, Rz, Ry, Rx, Rzyx, generate_config_file
 
 # plt.style.use('science')
 
@@ -78,9 +79,9 @@ _, spectrum = jonswap(hs, tp, gamma=3.3)
 
 wave_amp = np.sqrt(2*spectrum*dw)
 eps = np.random.uniform(0, 2*np.pi, size=N)
-beta = np.ones(N)*np.pi*2     # Waves moving north (positive x-direction)
+beta = np.ones(N)*np.pi     # Waves moving south (positive x-direction)
 
-vessel = RVG_DP_6DOF(dt, method="RK4")
+vessel = RVG_DP_6DOF(dt, config_file="rvg_config.json", method="RK4")
 
 wl = WaveLoad(
     wave_amps=wave_amp,
@@ -162,7 +163,7 @@ x_cg_eta = [np.array([-1.38, 0.])]
 hp = np.ix_([0,2],[0,2])
 for i, t in enumerate(time):
     pos = np.array([0.0, 0.0, 0.0, 0.0, 0.0, vessel.get_eta()[-1]])
-    tau_wf = wl.first_order_loads(t, pos)
+    tau_wf = wl.first_order_loads(t, vessel.get_eta())
     tau_wf[1] = 0.
     tau_wf[3] = 0.
     tau_wf[5] = 0.
@@ -176,8 +177,9 @@ for i, t in enumerate(time):
     x_cg_eta.append(transform(x_cg_eta[0][0], x_cg_eta[0][1], eta[0], eta[2], -eta[4]))
 
 
-with writer.saving(fig, os.path.join(os.path.dirname(__file__),"wave_motion1d.gif"), 100):
+with writer.saving(fig, os.path.join(os.path.dirname(__file__),"wave_motion1d_head_sea.gif"), 100):
     for j, t in enumerate(time):
+        print(f"Time:= {t:.2f}")
         zeta = wave(t)
         surge, heave, pitch = motion(t) 
         plt.title(f"t = {t:2f} [s]")

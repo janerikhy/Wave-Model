@@ -11,18 +11,17 @@ from MCSimPython.utils import Rzyx, J
 
 import os
 
-
 fullscale = True
 
 # Simulation and visualization params
 if fullscale:
-    fps = 30
+    fps = 20
 else:
     fps = 45
 
 dt = 1/fps
 
-tmax = 60
+tmax = 50
 tmin = 0
 time = np.arange(tmin, tmax, dt)
 
@@ -105,9 +104,9 @@ points[:, 2] = -points[:, 2]
 
 # Vessel and sea state
 if fullscale:
-    vessel = RVG_DP_6DOF(dt, method="RK4")
+    vessel = RVG_DP_6DOF(dt, method="RK4", config_file="rvg_config.json")
     hs = 2.5
-    tp = 8.5
+    tp = 12.0
 else:
     vessel = CSAD_DP_6DOF(dt, method="RK4")
     hs = 0.06
@@ -115,7 +114,7 @@ else:
 
 wp = 2*np.pi/tp
 
-N = 300
+N = 100
 
 wmin = wp/2.
 wmax = wp*3.
@@ -139,8 +138,8 @@ jonswap = JONSWAP(w)
 _, spectrum = jonswap(hs, tp, gamma=3.3)
 
 wave_amps = np.sqrt(2*spectrum*dw)
-# wave_angle = np.pi/4*np.ones(N)
-wave_angle = np.random.normal(-np.pi/4, np.pi/3/3, size=N)
+wave_angle = -np.pi*np.ones(N)
+# wave_angle = np.random.normal(np.pi/2, np.pi/8/3, size=N)  # Waves with some spreading, going West
 eps = np.random.uniform(0, 2*np.pi, size=N)
 
 waveload = WaveLoad(
@@ -149,7 +148,8 @@ waveload = WaveLoad(
     eps=eps,
     angles=wave_angle,
     config_file=vessel._config_file,
-    interpolate=True
+    interpolate=True,
+    qtf_method="geo-mean"
 )
 
 def wave_elevation(t):
@@ -163,8 +163,15 @@ fig, ax = plt.subplots(subplot_kw=dict(projection="3d"), figsize=(12, 12))
 hps = np.ix_([0, 1, 2], [0, 1, 2])
 ls = LightSource(azdeg=0, altdeg=60)
 
+vessel.set_eta(np.array([17., 0., 0., 0., 0., 0.]))
 
-with writer.saving(fig, os.path.join(os.path.dirname(__file__),"vessel_motion3d__rvg4.gif"), 100):
+# Simulate vessel for some seconds to remove transients
+time_prior = np.arange(-100, 0, dt)
+for i in range(time_prior.size):
+    tau_wf = waveload.first_order_loads(time_prior[i], vessel.get_eta())
+    vessel.integrate(0., 0., tau_wf)
+
+with writer.saving(fig, os.path.join(os.path.dirname(__file__),"vessel_motion3d__rvg_waveangle_180.gif"), 100):
     for j, t in enumerate(time):
 
         # tau_wf = waveload.first_order_loads(t, vessel.get_eta())

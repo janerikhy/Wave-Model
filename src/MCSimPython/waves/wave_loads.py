@@ -441,8 +441,6 @@ class FluidMemory:
         self.n_systems = len(self._xr)
 
         self.mu = np.zeros(6)
-
-
         
 
     @property
@@ -483,7 +481,7 @@ class FluidMemory:
         xr = [np.zeros(dim[0]) for dim in dimensions if len(dim) > 1]
         indices = [i for i, dim in enumerate(dimensions) if len(dim) > 1]
         Ar = [np.asarray(self._Ar_lst[ind]) for ind in indices]
-        Br = [np.asarray(self._Br_lst[ind]) for ind in indices]
+        Br = [np.asarray(self._Br_lst[ind]).reshape(-1,) for ind in indices]
         Cr = [np.asarray(self._Cr_lst[ind]) for ind in indices]
         return xr, Ar, Br, Cr, indices
     
@@ -496,3 +494,9 @@ class FluidMemory:
             self._xr[i] = self._xr[i] + self.dt * xr_dot
             yr[dof] += self._Cr[i]@self._xr[i]
         self.mu = yr
+        
+    def reset(self):
+        for i in range(len(self.indices)):
+            self._xr[i] = np.zeros_like(self._xr[i])
+        self.mu = np.zeros(6)
+        
