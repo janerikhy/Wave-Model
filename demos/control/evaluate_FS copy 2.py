@@ -91,7 +91,7 @@ ref_model = ref.ThrdOrderRefFilter(dt, omega = [.25, .2, .2])
 eta_ref = np.zeros((N, 3))   
 t = np.arange(0, dt*N, dt)
 
-cond1, cond2, cond3, cond4, cond5 = 50, 150, 200, 250, 350
+cond1, cond2, cond3, cond4, cond5 = 100, 150, 200, 250, 350
 t_cond1 = t > cond1 
 
 # Yaw test
@@ -110,7 +110,7 @@ K2 = [60, 60, 1]
 gamma_adap = np.ones((2*N_adap+1)*3)*1
 controller_adap.set_tuning_params(K1, K2, gamma=gamma_adap)
 
-controller_pid = ctrl.PID(kp=[25., 25., 25.], kd=[25., 25., 25.], ki=[0, 0, 0], dt=dt, returnIntegral=True)
+controller_pid = ctrl.PID(kp=[25., 25., 25.], kd=[25., 25., 25.], ki=[3, 3, 3], dt=dt, returnIntegral=True)
 
 
 
