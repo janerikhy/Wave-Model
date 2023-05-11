@@ -110,7 +110,7 @@ K2 = [60, 60, 1]
 gamma_adap = np.ones((2*N_adap+1)*3)*1
 controller_adap.set_tuning_params(K1, K2, gamma=gamma_adap)
 
-controller_pid = ctrl.PID(kp=[25., 25., 25.], kd=[25., 25., 25.], ki=[3, 3, 3], dt=dt, returnIntegral=True)
+controller_pid = ctrl.PID(kp=[60., 60., 60.], kd=[50., 50., 50.], ki=[5, 5, 5], dt=dt, returnIntegral=True)
 
 
 
