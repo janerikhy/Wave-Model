@@ -4,6 +4,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from time import time
+import scienceplots
+plt.style.use(['science','grid', 'no-latex'])
+from scipy.signal import csd 
+
 # MCSimPython library
 from MCSimPython import simulator as sim
 from MCSimPython import control as ctrl
@@ -19,11 +23,10 @@ from MCSimPython.thrust_allocation.allocation import fixed_angle_allocator
 from MCSimPython.simulator.thruster_dynamics import ThrusterDynamics
 from MCSimPython.thrust_allocation.thruster import Thruster
 from MCSimPython.vessel_data.CSAD.thruster_data import lx, ly, K
-from scipy.signal import csd 
 
 # Sim parameters --------------------------------------------------------
 dt = 0.02
-N = 20000
+N = 200000
 np.random.seed(1234)
 # Plot white noise and observe
 
@@ -83,7 +86,7 @@ eta_ref = np.zeros((N, 3))                                      # Stationkeeping
 
 
 # Controller ----------------------------------------------------------
-N_adap = 50
+N_adap = 0
 controller = AdaptiveFSController(dt, vessel._M, vessel._D, N = N_adap)
 #controller = ctrl.PD(kp=[100., 100., 100.], kd=[120., 120., 160.])
 
@@ -93,11 +96,15 @@ controller.set_freqs(w_min_adap, w_max_adap, N_adap)
 
 K1 = [20, 20, .1]
 K2 = [60, 60, 1]
-gamma_adap = .5
-gamma_adap = np.ones((2*N_adap+1)*3)*.01
-gamma_adap[:5] = 0.2
+#gamma_adap = .5
+gamma_adap = np.ones((2*N_adap+1)*3)*0.7
+#gamma_adap[0:51] = 0.05
+#gamma_adap[52:101] = 0.1 
+#gamma_adap[31:61] = 0.3 # indeks 60 = 0.31 Hz, indeks 30 = 0.17
+#gamma_adap[80:101] = 0.3 
 
 controller.set_tuning_params(K1, K2, gamma=gamma_adap)
+
 
 #controller._gamma[0,0] = .4
 #controller._gamma[2,2] = 20
@@ -115,7 +122,7 @@ wave_realization = jonswap.realization(time=np.arange(0,N*dt,dt), hs = hs, tp=tp
 
 # Simulation ========================================================
 N_theta = (6*N_adap + 3)
-storage = np.zeros((N, 88 + N_theta))
+storage = np.zeros((N, 91 + N_theta))
 
 t_global = time()
 for i in tqdm(range(N)):
@@ -163,12 +170,13 @@ for i in tqdm(range(N)):
 
     # Calculate simulator bias
     nu_cb_ext = np.concatenate((nu_cb, np.zeros(3)), axis=None)
-    b_optimal = Rz(psi)@six2threeDOF((vessel._D)@nu_cb_ext + tau_w_second)
+    b_optimal = six2threeDOF((vessel._D)@nu_cb_ext + tau_w_second)
+    b_optimal_ned = Rz(psi)@b_optimal
     gamma_adap = 0
 
     storage[i] = np.concatenate([t, vessel.get_eta(), vessel.get_nu(), eta_d, nu_d, y, tau_cmd, tau_w, 
                                  observer.get_x_hat(), eta_ref[i], bias_ctrl, tau_ctrl, time_ctrl2, tau_w_first, 
-                                 tau_w_second, u, zeta, K1, K2, gamma_adap, b_optimal, theta_hat], axis=None)
+                                 tau_w_second, u, zeta, K1, K2, gamma_adap, b_optimal, b_optimal_ned, theta_hat], axis=None)
                                 # OBSOBS: Legg inn ny data i storage FØR theta_hat
 t_global = time() - t_global
 
@@ -197,15 +205,17 @@ zeta = storage[:,77]
 k1 = storage[:,78:81]
 k2 = storage[:, 81:84]
 gamma_adap = storage[:, 84]
-b_optimal = storage[:, 85:88]
-theta_hat = storage[:,88:]
+b_optimal_body = storage[:, 85:88]
+b_optimal_ned = storage[:, 88:91]
+theta_hat = storage[:,91:]
 
 headers = ['time', 'eta1', 'eta2', 'eta3', 'eta4', 'eta5', 'eta6', 'nu1','nu2','nu3','nu4','nu5','nu6','eta_d_1', 'eta_d_2', 'eta_d_6', 'nu_d_1','nu_d_2','nu_d_6', 'y1','y2','y3','y4','y5','y6',
            'tau_cmd_1','tau_cmd_2','tau_cmd_6', 'tau_w_1', 'tau_w_2','tau_w_3','tau_w_4','tau_w_5','tau_w_6', 'xi_hat_1', 'xi_hat_2','xi_hat_3','xi_hat_4','xi_hat_5','xi_hat_6', 
            'eta_hat_1', 'eta_hat_2', 'eta_hat_6', 'bias_hat_1', 'bias_hat_2', 'bias_hat_6', 'nu_hat_1', 'nu_hat_2', 'nu_hat_6', 'eta_ref_1','eta_ref_2','eta_ref_6', 
            'bias_ctrl_1','bias_ctrl_2','bias_ctrl_6', 'tau_ctrl_1', 'tau_ctrl_2', 'tau_ctrl_6', 'time_ctrl', 'tau_w_first_1','tau_w_first_2','tau_w_first_3','tau_w_first_4',
            'tau_w_first_5','tau_w_first_6', 'tau_w_second_1','tau_w_second_2','tau_w_second_3','tau_w_second_4', 'tau_w_second_5','tau_w_second_6', 'u1','u2','u3','u4','u5',
-           'u6','zeta', 'K1_1', 'K1_2', 'K1_3', 'K2_1', 'K2_2', 'K2_3', 'gamma_adap', 'bias_optimal_1','bias_optimal_2','bias_optimal_6']
+           'u6','zeta', 'K1_1', 'K1_2', 'K1_3', 'K2_1', 'K2_2', 'K2_3', 'gamma_adap', 'bias_optimal_1','bias_optimal_2','bias_optimal_6', 'bias_optimal_ned_1','bias_optimal_ned_2',
+           'bias_optimal_ned_6']
 for i in range(N_theta):
     headers.append('theta_hat_'+str(i+1))
 
@@ -215,15 +225,15 @@ omega_plot = np.ones(2*N_adap+1)
 omega_plot[0] = 0
 for i in range(N_adap):
     omega_plot[2*i +1] = omega[i]
-    omega_plot[2*(i+1)] = omega[i] 
+    omega_plot[2*(i+1)] = omega[i]
 
 omega = np.concatenate((np.zeros(1), omega, omega), axis=None)
 
 # Create dataframe
-df = pd.DataFrame(storage, columns=headers)
+#df = pd.DataFrame(storage, columns=headers)
 # Convert to csv
 name = 'TEST_EvaluateFS__HeadSea_Hs_' + str(hs) + '_Tp_' + str(tp) + '_N_' + str(N_adap) + '.csv'
-df.to_csv(name)
+#df.to_csv(name)
 
 
 
@@ -303,8 +313,9 @@ fig, axs = plt.subplots(3, 1)
 plt.suptitle('Residual loads')
 for i in range(3):
     axs[i].plot(t, bias[:,i], label='Bias from controller '+ str(i+1))
-    axs[i].plot(t, bias_hat[:,i], label='Bias from observer '+ str(i+1))
-    axs[i].plot(t, b_optimal[:,i], label='Residual load from simulator')
+    #axs[i].plot(t, bias_hat[:,i], label='Bias from observer '+ str(i+1))
+    axs[i].plot(t, b_optimal_body[:,i], label='Residual load from simulator - BODY')
+    axs[i].plot(t, b_optimal_ned[:,i], label='Residual load from simulator, NED')
     axs[i].legend()
     axs[i].set_title(r'$\tau$' + str(i+1))
 plt.legend()
@@ -334,12 +345,49 @@ for i in range(2):
     axs[i].legend()
 plt.legend()
 
+N_theta_plot = 2*N_adap + 1
+theta_surge = theta_hat[-1, 0:N_theta_plot]
+theta_sway = theta_hat[-1, N_theta_plot:2*N_theta_plot]
+theta_yaw = theta_hat[-1, 2*N_theta_plot:]
+theta_list = [theta_surge, theta_sway, theta_yaw]
 
 fig, axs = plt.subplots(1, 1)
 plt.suptitle('Adaptive gains')
 for i in range(3):
-    axs.plot(theta_hat[-1, 0+i*(2*N_adap+1):(2*N_adap+1)+i*(2*N_adap+1)], label='DOF '+str(i+1))
+    axs.plot(theta_hat[-1, 0+i*(N_theta_plot):(N_theta_plot)+i*(N_theta_plot)], label='DOF '+str(i+1))
+    axs.plot(theta_list[i], label='check')
     axs.legend()
+
+theta_surge_split = np.zeros((2, N_adap+1))
+theta_surge_split[:,0] = np.concatenate((theta_surge[0], theta_surge[0]), axis=None)
+
+
+for i in range(N_adap-1):
+    theta_surge_split[0, i + 1] = theta_surge[2*i + 1]
+    theta_surge_split[1, i + 1] = theta_surge[2*i + 2]
+
+omega = np.linspace(w_min_adap, w_max_adap, N_adap) / (2*np.pi)
+omega = np.concatenate((np.zeros(1), omega), axis=None)
+print(omega)
+plt.figure()
+plt.scatter(omega, theta_surge_split[0])
+plt.scatter(omega, theta_surge_split[1])
+
+print(theta_surge_split)
+
+plt.figure()
+
+plt.plot(t, theta_hat[:,0], label='0 '+ str(omega[0]))
+#plt.plot(t, theta_hat[:,2], label='2 ' + str(omega[int(np.floor(2/2))]))
+#plt.plot(t, theta_hat[:,22], label='22 ' + str(omega[int(np.floor(22/2))]))
+#plt.plot(t, theta_hat[:,23], label='23 '+ str(omega[int(np.floor(23/2))]))
+#plt.plot(t, theta_hat[:,40], label='40 '+ str(omega[int(np.floor(40/2))]))
+#plt.plot(t, theta_hat[:,60], label='60 '+ str(omega[int(np.floor(60/2))]))
+#plt.plot(t, theta_hat[:,80], label='80 '+ str(omega[int(np.floor(80/2))]))
+
+plt.legend()
+
+
 '''
 plt.figure()
 plt.plot(t, tau_w_first[:,0]*0.001, label='1st order wave')
@@ -363,9 +411,17 @@ plt.legend()
 '''
 
 # Residual loads frequency
-freq1, psd1 = csd(b_optimal[:,0], b_optimal[:,0], fs = 50, nperseg=2**11)
-plt.figure()
-plt.plot(freq1, psd1, label='Residual')
-plt.legend()
+freq1, psd1 = csd(b_optimal_body[:,0], b_optimal_body[:,0], fs = 50, nperseg=2**11)
+freq2, psd2 = csd(bias[:,0], bias[:,0], fs = 50, nperseg=2**11)
+freq21, psd21 = csd(bias[int(-N/5):,0], bias[int(-N/5):,0], fs = 50, nperseg=2**11)
 
+freq_test = np.fft.fftfreq(t.shape[-1])
+psd_test = np.fft.fft(bias[:,0])
+
+plt.figure()
+plt.plot(freq1, psd1, label='Residual actual bias')
+plt.plot(freq2, psd2, label='Residual controller bias')
+plt.plot(freq21, psd21, label='Residual controller bias 2')
+
+plt.legend()
 plt.show()
