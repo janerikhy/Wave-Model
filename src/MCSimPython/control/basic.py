@@ -58,12 +58,13 @@ class PD:
 class PID:
     """Proportional-Derivative control with integral action."""
     
-    def __init__(self, kp: list, kd: list, ki: list, dt: float = 0.01):
+    def __init__(self, kp: list, kd: list, ki: list, dt: float = 0.01, returnIntegral: bool = False):
         self.Kp = np.diag(kp)
         self.Kd = np.diag(kd)
         self.Ki = np.diag(ki)
         self.zi = np.zeros(3)
         self.dt = dt
+        self.returnIntegral = returnIntegral
 
     def get_tau(self, eta, eta_d, nu, nu_d):
         """Calculate control loads.
@@ -91,6 +92,10 @@ class PID:
 
         self.zi[:2] += self.dt*(eta[:2] - eta_d[:2])
         self.zi[2] += self.dt*pipi(eta[2] - eta_d[2])
+
+        if self.returnIntegral:
+            return [-self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi, Rz(psi).T@self.Ki@self.zi]
+        
         return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
 
 
