@@ -24,6 +24,13 @@ class Controller(object):
         self.FS = adap.AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
 
         self.tau = np.zeros(3)
+        self.bias = np.zeros(3)
+
+        # For debugging
+        self.tau_z2 = np.zeros(3)
+        self.tau_alpha = np.zeros(3)
+        self.tau_alpha_dot = np.zeros(3)
+
 
         self.eta = np.zeros(3)
         self.nu = np.zeros(3)
@@ -39,9 +46,13 @@ class Controller(object):
         self.desiredState_sub = rospy.Subscriber(
             f"/{vessel_name}/reference", Float64MultiArray, self.refCallback, queue_size=1)
         self.tau_pub = rospy.Publisher(
-            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
+            f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1) 
+        self.controllerData_pub = rospy.Publisher(
+            f"/{vessel_name}/controllerData", Float64MultiArray, queue_size=1)  
 
         self.tau_msg = Float64MultiArray()
+        self.controllerData_msg = Float64MultiArray()
+
 
     def refCallback(self, msg):
         '''
@@ -66,7 +77,7 @@ class Controller(object):
         self.t += self.dt
         self.eta = np.asarray(self.eta)
         # print(self.t)
-        self.tau = self.FS.get_tau(self.eta, self.eta_d, self.nu, self.eta_d_dot, self.eta_d_ddot, self.t, calculate_bias = False)
+        self.tau, self.bias, self.tau_z2, self.tau_alpha, self.tau_alpha_dot = self.FS.get_tau(self.eta, self.eta_d, self.nu, self.eta_d_dot, self.eta_d_ddot, self.t, calculate_bias = True)
 
     def publishTau(self):
         '''
@@ -74,6 +85,15 @@ class Controller(object):
         '''
         self.tau_msg.data = self.tau
         self.tau_pub.publish(self.tau_msg)
+
+    def publishControllerData(self):
+        
+        self.controllerData_msg.data[0:3] = self.bias
+        self.controllerData_msg.data[3:6] = self.tau_z2
+        self.controllerData_msg.data[6:9] = self.tau_alpha
+        self.controllerData_msg.data[9:12] = self.tau_alpha_dot
+
+        self.controllerData_pub.publish(self.controllerData_msg)
 
 
 if __name__ == '__main__':
@@ -90,6 +110,7 @@ if __name__ == '__main__':
         controller.update()
         # Publish tau_cmd
         controller.publishTau()
+        controller.publishControllerData()
 
         r.sleep()
 

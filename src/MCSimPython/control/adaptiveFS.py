@@ -102,7 +102,10 @@ class AdaptiveFSController():
         # Calculate bias
         if calculate_bias:
             b_hat = Phi.T@self.theta_hat
-            return tau, b_hat
+            tau_z2 = -self._K2@z2
+            tau_alpha = self._D@alpha
+            tau_alpha_dot = self._M@alpha_dot
+            return tau, b_hat, tau_z2, tau_alpha, tau_alpha_dot
         
         return tau
 
