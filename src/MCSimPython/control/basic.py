@@ -103,9 +103,9 @@ class PID:
         tau = -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
         
         # Integral windup
-        if np.abs(tau) > self.tau_sat:  
-            self.zi -= self.dt*eta_tilde
-            return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
+        #if np.abs(tau) > self.tau_sat:  
+        #    self.zi -= self.dt*eta_tilde
+        #    return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
 
         return tau
     
