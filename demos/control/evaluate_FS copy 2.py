@@ -7,6 +7,8 @@ from time import time
 import scienceplots
 plt.style.use(['science','grid', 'no-latex'])
 from scipy.signal import csd 
+from scipy.linalg import eig
+
 width = 1000            # Latex document width in pts
 inch_pr_pt = 1/72.27        # Ratio between pts and inches
 golden_ratio = (np.sqrt(5) - 1)/2
@@ -32,7 +34,7 @@ from MCSimPython.vessel_data.CSAD.thruster_data import lx, ly, K
 
 # Sim parameters --------------------------------------------------------
 dt = 0.02
-N = 50000
+N = 70000
 np.random.seed(1234)
 # Plot white noise and observe
 
@@ -50,7 +52,7 @@ nu_cn = U*np.array([np.cos(beta_u), np.sin(beta_u), 0])
 # Waves
 N_w = 25                                            # Number of wave components
 hs = 0.03                                           # Significant wave height
-tp = 1.2                                            # Peak period
+tp = 1.5                                            # Peak period
 wp = 2*np.pi/tp                                     # Peak frequency
 wmin = wp/2
 wmax = 2.5*wp
@@ -66,32 +68,32 @@ eps = np.random.uniform(0, 2*np.pi, size=N_w)       # Phase
 wave_dir = np.deg2rad(180) * np.ones(N_w)           # Direction
 
 # Wave loads
-#waveload = wave.WaveLoad(wave_amps, w_wave, eps, wave_dir, 
-#                            config_file=vessel._config_file) 
+waveload = wave.WaveLoad(wave_amps, w_wave, eps, wave_dir, 
+                            config_file=vessel._config_file) 
 
 
 
 # Observer ----------------------------------------------------------
-observer = LTVKF(dt, vessel._M, vessel._D, Tp=tp*1e5)
+observer = LTVKF(dt, vessel._M, vessel._D, Tp=tp)
 observer.set_tuning_matrices(
             np.array([
-                [1e-1,0,0,0,0,0],
-                [0,1e-1,0,0,0,0],
+                [1e7,0,0,0,0,0],
+                [0,1e7,0,0,0,0],
                 [0,0,1e2*np.pi/180,0,0,0],
-                [0,0,0,1e6,0,0],
-                [0,0,0,0,1e6,0],
-                [0,0,0,0,0,1e2]]), 
+                [0,0,0,1e3,0,0],
+                [0,0,0,0,1e3,0],
+                [0,0,0,0,0,1e1]]), 
             np.array([
-                [1e-5,0,0],
-                [0,1e-5,0],
-                [0,0,np.pi/180]]))
+                [1e-2,0,0],
+                [0,1e-2,0],
+                [0,0,1e2*np.pi/180]]))
 
 # Reference model -----------------------------------------------------
 ref_model = ref.ThrdOrderRefFilter(dt, omega = [.25, .2, .2])   
 eta_ref = np.zeros((N, 3))   
 t = np.arange(0, dt*N, dt)
 
-cond1, cond2, cond3, cond4, cond5 = 100, 150, 200, 250, 350
+cond1, cond2, cond3, cond4, cond5 = 200, 150, 200, 250, 350
 t_cond1 = t > cond1 
 
 # Yaw test
@@ -107,11 +109,15 @@ w_max_adap = 2*np.pi/2                           # Upper bound
 controller_adap.set_freqs(w_min_adap, w_max_adap, N_adap)
 K1 = [20, 20, .1]
 K2 = [60, 60, 1]
-gamma_adap = np.ones((2*N_adap+1)*3)*1
+gamma_adap = np.ones((2*N_adap+1)*3)*2
 controller_adap.set_tuning_params(K1, K2, gamma=gamma_adap)
 
-controller_pid = ctrl.PID(kp=[60., 60., 60.], kd=[50., 50., 50.], ki=[5, 5, 5], dt=dt, returnIntegral=True)
+controller_pid = ctrl.PID(kp=[60., 60., 60.], kd=[50., 50., 50.], ki=[2, 2, 2], dt=dt, returnIntegral=True)
 
+M_eig = six2threeDOF(vessel._M)
+K_eig = six2threeDOF(vessel._G + three2sixDOF(np.diag([60., 60., 60.])))
+values, vectors = eig(a = M_eig, b = K_eig)
+print(np.sqrt(values))
 
 
 # Thrust allocation --------------------------------------------------
@@ -147,12 +153,12 @@ for i in tqdm(range(N)):
     nu_d = Rz(psi).T@eta_d_dot
 
     # Wave forces
-    #tau_w_first = waveload.first_order_loads(t, vessel.get_eta())
-    #tau_w_second = waveload.second_order_loads(t, vessel.get_eta()[-1])
-    #tau_w = tau_w_first + tau_w_second
-    tau_w_second = np.zeros(6)
-    tau_w_first = np.zeros(6)
-    tau_w = np.zeros(6)
+    tau_w_first = waveload.first_order_loads(t, vessel.get_eta())
+    tau_w_second = waveload.second_order_loads(t, vessel.get_eta()[-1])
+    tau_w = tau_w_first + tau_w_second
+    #tau_w_second = np.zeros(6)
+    #tau_w_first = np.zeros(6)
+    #tau_w = np.zeros(6)
 
     # Controller
     time_ctrl = time()
@@ -394,9 +400,9 @@ plt.scatter(omega, theta_surge_split[1])
 
 
 # Residual loads frequency
-freq1, psd1 = csd(b_optimal_body[:,0], b_optimal_body[:,0], fs = 50, nperseg=N)
-freq2, psd2 = csd(bias[:,0], bias[:,0], fs = 50, nperseg=N)
-freq21, psd21 = csd(bias[int(-N/5):,0], bias[int(-N/5):,0], fs = 50, nperseg=N)
+freq1, psd1 = csd(b_optimal_body[:,0], b_optimal_body[:,0], fs = 50, nperseg=2**10)
+freq2, psd2 = csd(bias[:,0], bias[:,0], fs = 50, nperseg=2**10)
+freq21, psd21 = csd(bias[int(-N/5):,0], bias[int(-N/5):,0], fs = 50, nperseg=2**10)
 
 freq_test = np.fft.fftfreq(t.shape[-1])
 psd_test = np.fft.fft(bias[:,0])
