@@ -70,7 +70,7 @@ class PID:
 
         self.tau_sat = .5
 
-    def get_tau(self, eta, eta_d, nu, nu_d):
+    def get_tau(self, eta, eta_d, nu, nu_d, return_integral = False):
         """Calculate control loads.
         
         Parameters
@@ -106,7 +106,9 @@ class PID:
         #if np.abs(tau) > self.tau_sat:  
         #    self.zi -= self.dt*eta_tilde
         #    return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
-
+        if return_integral:
+            return tau, Rz(psi).T@self.Ki@self.zi
+        
         return tau
     
 class PI:

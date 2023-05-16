@@ -22,6 +22,7 @@ class Controller (object):
         self.tau = np.zeros(3)  # Command forces [surge, sway, yaw]
         self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
         self.nu = np.zeros(3)   # Velocity [surge, sway, yaw]
+        self.int = np.zeros(3)  # Integral term
 
         self.eta_d = np.zeros(3)  # Desired pose, attitude [surge, sway, yaw]
         self.nu_d = np.zeros(3)   # Desired velocity [surge, sway, yaw]
@@ -36,10 +37,13 @@ class Controller (object):
             f"/{vessel_name}/pid_gains", Float64MultiArray, self.gainsCallback, queue_size=1)
         self.tau_pub = rospy.Publisher(
             f"/{vessel_name}/tau_cmd", Float64MultiArray, queue_size=1)  # Odometry subscriber
+        self.int_pub = rospy.Publisher(
+            f"/{vessel_name}/integral", Float64MultiArray, queue_size=1)  # Odometry subscriber
 
         # Messages
         self.tau_msg = Float64MultiArray()  # command forces [surge, sway, yaw]
-
+        self.int_msg = Float64MultiArray()
+        
     def gainsCallback(self, msg):
         self.pid.set_kp([msg.data[0], msg.data[1], msg.data[2]])
         self.pid.set_ki([msg.data[3], msg.data[4], msg.data[5]])
@@ -64,7 +68,7 @@ class Controller (object):
             Calculate desired forces. [surge, sway, yaw]
         """
         # Calculate desired forces
-        self.tau = self.pid.get_tau(self.eta, self.eta_d, self.nu, self.nu_d)
+        self.tau, self.int = self.pid.get_tau(self.eta, self.eta_d, self.nu, self.nu_d, return_integral=True)
 
     def publishTau(self):
         """
@@ -73,6 +77,12 @@ class Controller (object):
         self.tau_msg.data = self.tau
         self.tau_pub.publish(self.tau_msg)
 
+    def publishInt(self):
+            """
+                Publish integral forces. [surge, sway, yaw]
+            """
+            self.int_msg.data = self.int
+            self.int_pub.publish(self.int_msg)
 
 if __name__ == '__main__':
     rospy.init_node("controller")
@@ -89,6 +99,7 @@ if __name__ == '__main__':
 
         # publish command forces
         controller.publishTau()
+        controller.publishInt()
 
         r.sleep()
 
