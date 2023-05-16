@@ -22,7 +22,7 @@ class ReferenceModel (object):
 
         x_start = 3.4
         y_start = -0.5
-        psi_start = np.deg2rad(0)
+        psi_start = np.deg2rad(-30)
 
         self.eta_d = np.array([x_start,y_start,psi_start])   #np.zeros(3)        # Pose, attitude [surge, sway, yaw]
         self.eta_d_dot = np.zeros(3)    # Velocity [surge, sway, yaw]
@@ -58,7 +58,7 @@ class ReferenceModel (object):
                            np.array([0.0 + x_start, 1.0 + y_start, 0.0 + psi_start])]
         elif self.test == 'yaw':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, 0.0 + psi_start]), 
-                           np.array([0.0 + x_start, 0.0 + y_start, np.pi/4 + psi_start])]
+                           np.array([0.0 + x_start, 0.0 + y_start, np.deg2rad(60) + psi_start])]
         elif self.test == 'surgesway':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
                            np.array([-1.0 + x_start, 0.0 + y_start, psi_start])]
@@ -68,6 +68,8 @@ class ReferenceModel (object):
         elif self.test == 'stationkeeping':
             self.wpList = [np.array([0.0 + x_start, 0.0 + y_start, psi_start]), 
                            np.array([0.0 + x_start, 0.0 + y_start, psi_start])]
+        elif self.test == '360turn':
+             self.wpList = 0
         else:
             self.wpList == [np.array([0.0, 0.0, 0.0])]
             rospy.logwarn('Unable to understand mission')
