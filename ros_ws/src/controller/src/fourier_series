@@ -5,11 +5,12 @@ from std_msgs.msg import Float64MultiArray
 from nav_msgs.msg import Odometry
 from MCSimPython.control.adaptiveFS import AdaptiveFSController
 from MCSimPython.simulator import CSAD_DP_6DOF 
+from MCSimPython.control.adaptiveFS import AdaptiveFSController
 import numpy as np
 
-import sys
-sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
-import src.MCSimPython.control.adaptiveFS as adap
+#import sys
+#sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+#import src.MCSimPython.control.adaptiveFS as adap
 
 vessel_name = 'CSAD'
 
@@ -21,7 +22,7 @@ class Controller(object):
 
         # Vessel initialization
         self.vessel = CSAD_DP_6DOF(dt)
-        self.FS = adap.AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
+        self.FS = AdaptiveFSController(dt, M=self.vessel._M, D=self.vessel._D, N=15)
 
         self.tau = np.zeros(3)
         self.bias = np.zeros(3)
@@ -30,7 +31,6 @@ class Controller(object):
         self.tau_z2 = np.zeros(3)
         self.tau_alpha = np.zeros(3)
         self.tau_alpha_dot = np.zeros(3)
-
 
         self.eta = np.zeros(3)
         self.nu = np.zeros(3)
