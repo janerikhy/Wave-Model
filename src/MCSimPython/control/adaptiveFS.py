@@ -96,8 +96,8 @@ class AdaptiveFSController():
         self.theta_hat  += (theta_hat_dot * self._dt)
 
         # Control law
-        tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat
-        # tau = R@tau                              # Ref frame of tau?
+        tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat           # In body frame
+       
 
         # Calculate bias
         if calculate_bias:
