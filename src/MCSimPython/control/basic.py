@@ -5,6 +5,8 @@
 # Created By: Jan-Erik Hygen
 # Created Date: 2023-01-30
 # Revised: 2023-02 - Added Direct Bias Compensation Controller - Harald Mo
+#          2023-05 - Added PI controller - Harald Mo
+#
 # Tested:
 # 
 # Copyright (C) 2023: NTNU, Trondheim
@@ -99,6 +101,41 @@ class PID:
         return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
 
 
+class PI:
+    """Proportional control with integral action."""
+
+    def __init__(self, kp: list, ki: list, dt: float = 0.01):
+        self.Kp = np.diag(kp)
+        self.Ki = np.diag(ki)
+        self.zi = np.zeros(3)
+        self.dt = dt
+
+    def get_tau(self, eta, eta_d):
+        """Calculate control loads.
+        
+        Parameters
+        ----------
+        eta : array_like
+            Vessel pose in surge, sway and yaw.
+        eta_d : array_like
+            Desired vessel pose in surge, sway and yaw (NED-frame).
+        
+        Returns
+        -------
+        tau : array_like
+            Controller load in surge, sway, and yaw (body-frame).
+        """
+        psi = eta[-1]
+
+        eta_tilde = eta - eta_d
+        eta_tilde[-1] = pipi(eta_tilde[-1])
+
+        z1 = Rz(psi).T@eta_tilde
+
+        self.zi += self.dt*(eta_tilde)
+
+        return -self.Kp@z1 - Rz(psi).T@self.Ki@self.zi
+    
 
 class DirectBiasCompensationController():
     '''

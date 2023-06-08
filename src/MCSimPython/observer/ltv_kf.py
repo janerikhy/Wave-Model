@@ -1,9 +1,11 @@
 # ltv_kf.py
 # ----------------------------------------------------------------------------
 # This code is part of the MCSimPython toolbox and repository.
-# Created By: Harald Mo
+# Created By:   Harald Mo
 # Created Date: 2023-05-03
-# 
+# Revised:      2023-05-09 Harald Mo        Added dead reckoning
+#
+#
 # Copyright (C) 2023: NTNU, Trondheim
 # Licensed under GPL-3.0-or-later
 # ---------------------------------------------------------------------------
@@ -118,7 +120,7 @@ class LTVKF():
         self._H[0:3,3:6], self._H[0:3,6:9] = np.eye(3), np.eye(3)
 
 
-    def update(self, tau, y, psi_m, asynchronous = False):
+    def update(self, tau, y, psi_m, asynchronous = False, dead_reckoning = False):
         '''
         Update:
         Update function to be called at every timestep during a simulation. Calls the predictor and corrector.
@@ -136,13 +138,13 @@ class LTVKF():
             return None
         
         # Correct
-        self.corrector(y)
+        self.corrector(y, dead_reckoning)
         # Predict        
         self.predictor(tau, psi_m)
     
 
     def update_async(self, tau, y, psi_m):
-        return NotImplementedError
+        raise NotImplementedError
     
         
     
@@ -153,8 +155,8 @@ class LTVKF():
         self.Pbar = Ad@self.Phat@Ad.T + self._Ed@self.Qd@self._Ed.T
 
     
-    def corrector(self, y):
-        if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
+    def corrector(self, y, dead_reckoning):
+        if dead_reckoning:    # If dead reckoning: Set corrector equal to predictor (Dead reckoning)
             self.Phat = self.Pbar
             self.xhat = self.xbar
         else:
@@ -195,7 +197,7 @@ class LTVKF():
               0_(3x6)   0_(3x3)     0_(3x3)         0_(3x3)     \n
               0_(3x6)   0_(3x3)     M_inv*R(t).T    -M_inv*D ]
         and 
-        Ad = e^(dt*A)   OR   Ad = I + dt * A
+        Ad = I + dt * A
         '''
         A = np.block([
             [self._Aw,          np.zeros((6,3)),    np.zeros((6,3)),      np.zeros((6,3))],
