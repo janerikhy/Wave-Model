@@ -147,5 +147,10 @@ ffmpeg.exe
 notebooks/
 notebooks/*
 
+data_processing/
+
+# Ignore ros build and devel files
+/ros_ws/devel/
+/ros_ws/build/
 # Ignore get-pip.py
 get-pip.py

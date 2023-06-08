@@ -36,9 +36,9 @@ class AdaptiveFSController():
         self.set_freqs(w_min, w_max, N)
 
         # Tuning:
-        self._K1 = np.diag([.1, 1., .1])
-        self._K2 = np.diag([.1, 1., .1])*10
-        self._gamma = np.eye((2*self._N +1)*3) * 5
+        self._K1 = np.diag([.1, 1., .0001])*1e-11
+        self._K2 = np.diag([.1, 1., .0001])*1e-11
+        self._gamma = np.eye((2*self._N +1)*3) * 1e-15
         self._kappa = 1                             # Must be positive
 
 
@@ -102,7 +102,10 @@ class AdaptiveFSController():
         # Calculate bias
         if calculate_bias:
             b_hat = Phi.T@self.theta_hat
-            return tau, b_hat
+            tau_z2 = -self._K2@z2
+            tau_alpha = self._D@alpha
+            tau_alpha_dot = self._M@alpha_dot
+            return tau, b_hat, tau_z2, tau_alpha, tau_alpha_dot
         
         return tau
 
@@ -148,7 +151,6 @@ class AdaptiveFSController():
         except ZeroDivisionError:
             self._freqs = np.array([])
             
-
     def set_tuning_params(self, K1: list, K2: list, gamma: list):
         self._K1 = np.diag(K1)
         self._K2 = np.diag(K2)

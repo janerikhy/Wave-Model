@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+from MCSimPython.simulator.thruster_dynamics import ThrusterDynamics
+from std_msgs.msg import Float64MultiArray
+vessel_name = "CSAD"
+from MCSimPython.utils import Rx
+
+class ThrustAlloc(object):
+    def __init__(self) -> None:
+        self.counter = 0.0
+        self.u = np.zeros(4)
+        self.alpha = np.zeros(4)
+        self.tau, self.tau_cmd = np.zeros(6), np.zeros(6)
+        '''
+        # 6 Thrusters
+        # x position of thruster in body frame
+        self.Lx = np.array(
+            [1.0678, 0.9344, 0.9344, -1.1644, -0.9911, -0.9911])
+        # y position of thruster in body frame
+        self.Ly = np.array([0.0, 0.11, -0.11, 0.0, -0.1644, 0.1644])
+        self.K = np.array([0.3763, 0.3901, 0.3776, 0.5641,
+                           0.4799, 0.5588])  # Thrust koefficient
+
+                # Exended configuration matrix
+        self.T_ext = np.array([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                               [0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+                                   0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
+                               [-self.Ly[0], self.Lx[0], -self.Ly[1], self.Lx[1], -self.Ly[2], self.Lx[2], -self.Ly[3], self.Lx[3], -self.Ly[4], self.Lx[4], -self.Ly[5], self.Lx[5]]])
+        self.K_ext = np.diag([self.K[0], self.K[0],self.K[1], self.K[1],self.K[2], self.K[2],
+                              self.K[3], self.K[3],self.K[4], self.K[4],self.K[5], self.K[5]])
+        '''
+        #  4 Thrusters
+        self.Lx = np.array(
+            [1.0678, 0.9344, -1.1644, -0.9911])
+        # y position of thruster in body frame
+        self.Ly = np.array([0.0, 0.11, 0.0, 0.1644])
+        self.K = np.array([0.3763, 0.3901, 0.5641, 0.5588])  # Thrust koefficient
+        #self.K = np.array([0.45, 0.45, 0.46, 0.46])
+
+        # Exended thrust koefficient
+        self.K_ext = np.diag([self.K[0], self.K[0], self.K[1], self.K[1], self.K[2],
+                             self.K[2], self.K[3], self.K[3]])
+
+        # Exended configuration matrix
+        self.T_ext = np.array([[1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
+                               [0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+                                   0.0, 1.0],
+                               [-self.Ly[0], self.Lx[0], -self.Ly[1], self.Lx[1], -self.Ly[2], self.Lx[2], -self.Ly[3], self.Lx[3]]])
+        
+        # Invers the configuration and koefficient matrices
+        self.K_extInv = np.linalg.inv(self.K_ext)
+        self.T_extInv = np.linalg.pinv(self.T_ext)
+
+        # Publishers/Subscribers
+        self.u_pub = rospy.Publisher(
+            f"/{vessel_name}/u", Float64MultiArray, queue_size=1)
+        self.alpha_pub = rospy.Publisher(
+            f"/{vessel_name}/alpha", Float64MultiArray, queue_size=1)
+        self.tau_pub = rospy.Publisher(
+            f"/{vessel_name}/tau", Float64MultiArray, queue_size=1)
+        # Messages
+        self.u_msg = Float64MultiArray()
+        self.alpha_msg = Float64MultiArray()
+        self.tau_msg = Float64MultiArray()
+
+    def ssa(self, angle):
+        """
+            Shortest signed angle between two angles.
+        """
+        angle = ((angle + np.math.pi) % (2*np.math.pi)) - np.math.pi
+
+        return angle
+
+    def callback(self, msg):
+        """
+            Allocate the forces to be  produced by each thruster, and publish the command forces to the u topic.
+        """
+        self.tau_cmd = msg.data
+
+        # Rotate*
+        self.tau_cmd = Rx(np.pi)@self.tau_cmd
+
+        # Amplify small values of tau
+        '''
+        for i in range(len(self.tau_cmd)):
+            tau_cmd_i = np.abs(self.tau_cmd[i])
+            if tau_cmd_i > 0.003 and tau_cmd_i < 0.08:
+                self.tau_cmd[i] = 0.08 * np.sign(self.tau_cmd[i])
+        '''
+        # Calculating decomposed power for each thruster
+        self.u_ext = np.matmul(
+            np.matmul(self.K_extInv, self.T_extInv), self.tau_cmd)
+
+        # Calculate individual thruster force
+        for i in range(len(self.u)):
+            self.u[i] = np.math.sqrt(
+                self.u_ext[i*2]**2 + self.u_ext[i*2+1]**2)
+            self.u[i] += 0.10       # Thruster bias
+
+        # Calculate individual thruster angle
+        for i in range(len(self.alpha)):
+            self.alpha[i] = self.ssa(np.math.atan2(
+                self.u_ext[2*i+1], self.u_ext[2*i]))
+        
+
+    def calculate_tau_ctrl(self):
+        # Saturate control signal
+        self.u = np.clip(self.u, -.5, .5)
+
+        # Amplify small values of u
+        '''
+        for i in range(len(self.u)):
+            u_i = np.abs(self.u[i])
+            if u_i > 0.02 and u_i < 0.108:
+                self.u[i] = 0.108 * np.sign(self.u[i])
+            elif u_i <= 0.02:
+                self.u[i] = 0.0
+        '''
+        # Calculate actual (estimated) tau from thrusters
+        actuator_loads = np.diag(self.K) @ self.u
+        self.tau = self.thruster_configuration(self.alpha) @ actuator_loads
+
+        # Store in topic, rotate*
+        self.tau = np.asarray(self.tau)
+        self.tau = Rx(np.pi)@self.tau
+
+        self.tau_msg.data = self.tau
+
+        
+    def thruster_configuration(self, alpha):
+
+        """
+        Sets up the thrust configuration matrix.
+        
+        Parameters
+        -----------
+        alpha : array_like
+            Azimuth angles.
+
+        Returns
+        --------
+         : array_like
+            Thrust configuration matrix.
+        """
+
+        return np.array([
+            np.cos(alpha),
+            np.sin(alpha),
+            self.Lx * np.sin(alpha) - self.Ly * np.cos(alpha)
+        ])    
+
+    def publish(self):
+        """
+            Publish command forces to tau topic.
+        """
+
+        # update message
+        self.calculate_tau_ctrl()
+
+
+        # If 6 Thrusters
+        #self.u_msg.data = np.array([self.u[0], self.u[1], self.u[2], self.u[3], self.u[4], self.u[5],
+        #                           self.alpha[0], self.alpha[1], self.alpha[2], self.alpha[3], self.alpha[4], self.alpha[5]])
+        
+        # If 4 Thrusters
+        self.u_msg.data = np.array([self.u[0], self.u[1], 0.0, self.u[2], 0.0, self.u[3],
+                                   self.alpha[0], self.alpha[1], 0.0, self.alpha[2], 0.0, self.alpha[3]])
+        
+        # If custom test
+        #self.u_msg.data = np.array([self.u[0], 0., 0.0 , 0. , 0.0 , 0.0, 
+        #                            0., 0.0 , 0.0, 0.0,0.0, 0.0])
+        
+
+        self.alpha_msg.data = self.alpha
+
+        # publish messsage
+        self.u_pub.publish(self.u_msg)
+
+        self.alpha_pub.publish(self.alpha_msg)
+
+        self.tau_pub.publish(self.tau_msg)
+
+if __name__ == '__main__':
+    rospy.init_node("thrust_alloc")
+    rospy.loginfo("INITIALIZING THRUSTER ALLOCATION NODE")
+    r = rospy.Rate(100)
+
+    thrustAlloc = ThrustAlloc()
+    tau_sub = rospy.Subscriber(
+        f"/CSAD/tau_cmd", Float64MultiArray, thrustAlloc.callback, queue_size=1)
+
+    while not rospy.is_shutdown():
+        thrustAlloc.publish()
+
+
+        r.sleep()
+
+    rospy.spin()

@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+import math
+
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import String
+
+
+vessel_name = "CSAD"
+
+
+class Mission (object):
+    def __init__(self, dt=0.01) -> None:
+        self.dt = dt            # Timestep
+        self.eta = np.zeros(3)  # Pose, attitude [surge, sway, yaw]
+        self.mission = ""
+
+        self.wpList = np.array([])
+
+        self.fourCornerTest = [np.array([0.0, 0.0, 0.0]),
+                               np.array([1.0, 0.0, 0.0]),
+                               np.array([1.0, 1.0, 0.0]),
+                               np.array([1.0, 1.0, np.pi/4]),
+                               np.array([0.0, 1.0, np.pi/4])]   # Waypoints list
+
+        self.surgeTest = [np.array([0.0, 0.0, 0.0]),
+                          np.array([1.0, 0.0, 0.0])]
+        self.swayTest = [np.array([1.0, 0.0, 0.0]),
+                         np.array([1.0, 1.0, 0.0])]
+        self.yawTest = [np.array([1.0, 1.0, 0.0]),
+                        np.array([1.0, 1.0, np.pi/4])]
+        self.surgeSwayTest = [np.array([1.0, 1.0, np.pi/4]),
+                              np.array([0.0, 1.0, np.pi/4])]
+        self.surgeSwayYawTest = [
+            np.array([0.0, 0.0, 0.0]), np.array([0.0, 1.0, np.pi/4])]
+
+        # Subscribers/Publishers
+        self.wpList_pub = rospy.Publisher(
+            f"/{vessel_name}/waypoints", Float64MultiArray, queue_size=1)             # Desired state publishe
+        self.mission_sub = rospy.Subscriber(
+            f"/{vessel_name}/mission", String, self.missionCallback, queue_size=1)  # Mission subscriber
+        self.odom_sub = rospy.Subscriber(
+            f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)  # Odometry subscriber
+
+        # Messages
+        self.mission_msg = Float64MultiArray()  # List of waypoints
+
+    def missionCallback(self, msg):
+        """
+            Mission callback.
+        """
+        # save mission
+
+        self.mission = msg.data
+
+        # Update wp list based on mission
+        self.updateMission()
+
+    def odomCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.odom_msg = msg
+
+        # Quaternions
+        w = msg.pose.pose.orientation.w
+        x = msg.pose.pose.orientation.x
+        y = msg.pose.pose.orientation.y
+        z = msg.pose.pose.orientation.z
+
+        # Position and attitude
+        self.eta[0] = msg.pose.pose.position.x
+        self.eta[1] = msg.pose.pose.position.y
+        # quaternion to euler
+        self.eta[2] = math.atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+
+    def updateMission(self):
+
+        # Add current position as first wp
+        self.wpList = np.array([self.eta[0], self.eta[1], self.eta[2]])
+
+        # Add tests to wp list
+        if self.mission == "surge":
+            self.wpList = np.append(self.wpList, self.surgeTest)
+            print("Surge test mission recieved. Initializing mission.")
+        elif self.mission == "sway":
+            self.wpList = np.append(self.wpList, self.swayTest)
+            print("Sway test mission recieved. Initializing mission.")
+        elif self.mission == "yaw":
+            self.wpList = np.append(self.wpList,  self.yawTest)
+            print("Yaw test mission recieved. Initializing mission.")
+        elif self.mission == "surgeSway":
+            self.wpList = np.append(self.wpList,  self.surgeSwayTest)
+            print("Coupled surge-sway test mission recieved. Initializing mission.")
+        elif self.mission == "surgeSwayYaw":
+            self.wpList = np.append(self.wpList, self.surgeSwayYawTest)
+            print(" Coupled surge-sway-yaw test mission recieved. Initializing mission.")
+        elif self.mission == "4corner":
+            self.wpList = np.append(self.wpList, self.fourCornerTest)
+            print("4 corner test mission recieved. Initializing mission.")
+        elif self.mission == "stationkeeping":
+            print("Stop command recieved to mission node. Abborting current mission.")
+            self.wpList = np.array([self.eta[0], self.eta[1], self.eta[2]])
+        else:
+            print("Invalid mission. Abborting current mission.")
+            self.wpList = np.array([])
+
+        # Second wp turns vessel towards the correct point
+        second_wp = np.array([self.eta[0], self.eta[1], math.atan2(
+            self.wpList[1+3] - self.eta[1], self.wpList[0+3] - self.eta[0])])
+        thrd_wp = np.array([self.wpList[0+3], self.wpList[1+3], second_wp[2]])
+
+        self.wpList = np.insert(self.wpList, 3, thrd_wp)
+        self.wpList = np.insert(self.wpList, 3, second_wp)
+
+        # update message
+        self.mission_msg.data = self.wpList
+
+        # publish wp list to guidance node
+        self.publishMission()
+
+        # Reset mission
+        self.mission = ""
+        self.wpList = np.array([])
+
+    def publishMission(self):
+        """
+            Publishes mission to guidance node.
+        """
+        self.wpList_pub.publish(self.mission_msg)
+
+
+if __name__ == '__main__':
+    rospy.init_node("mission")
+    rospy.loginfo(f"INITIALIZING {vessel_name} MISSION NODE")
+    r = rospy.Rate(100)
+    dt = 0.01  # Timestep corresponding to sampling frequency of 100 Hz
+
+    # initialize reference model
+    mission = Mission()
+
+    while not rospy.is_shutdown():
+
+        r.sleep()
+
+    rospy.spin()

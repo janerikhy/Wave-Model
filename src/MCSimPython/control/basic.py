@@ -67,6 +67,7 @@ class PID:
         self.zi = np.zeros(3)
         self.dt = dt
 
+
     def get_tau(self, eta, eta_d, nu, nu_d):
         """Calculate control loads.
         
@@ -156,6 +157,8 @@ class DirectBiasCompensationController():
             Desired vessel velocity in surge, sway and yaw (body-frame).
         b : array_like
             Estimated bias in surge, sway and yaw (body-frame)
+
+        Remark: Reference frame of bias!
         '''
         psi = eta[-1]
         z1 = Rz(psi).T@(eta-eta_d)              # P

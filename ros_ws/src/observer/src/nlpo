@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+import rospy
+import numpy as np
+
+from std_msgs.msg import Float64MultiArray
+from nav_msgs.msg import Odometry
+
+
+import sys
+sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+import src.MCSimPython.observer.nonlinobs as nlo
+from MCSimPython.simulator.csad import CSADMan3DOF
+
+
+class Observer(object):
+    def __init__(self, dt, Tp) -> None:
+        self.dt = dt
+        wp = 2*np.pi/Tp
+        w0 = wp
+        wc = 1.1*wp
+
+        csad = CSADMan3DOF(dt)
+
+        self.nlpo = nlo.NonlinObs3dof(dt, wc, w0, 0.05, 100, csad._M, csad._D)
+
+        self.y = np.zeros(3)
+        self.tau = np.zeros(3)
+
+        self.pub = rospy.Publisher(
+            f"/{vessel_name}/observer_states_nlpo", Float64MultiArray, queue_size=1)         # publishing estimated pos, vel, bias and wave
+        self.subTau = rospy.Subscriber(
+            f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
+        self.odom_sub = rospy.Subscriber(
+            f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
+        
+        self.observer_msg = Float64MultiArray()
+        
+    def odomCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.odom_msg = msg
+
+        # Position
+        eta_x = msg.pose.pose.position.x
+        eta_y = msg.pose.pose.position.y
+        eta_z = msg.pose.pose.position.z
+
+        # Quaternions (attitude)
+        q_w = msg.pose.pose.orientation.w
+        q_x = msg.pose.pose.orientation.x
+        q_y = msg.pose.pose.orientation.y
+        q_z = msg.pose.pose.orientation.z
+
+        self.psi = np.arctan2(2*(q_w*q_z + q_x*q_y), 1 - 2*(q_y*q_y + q_z*q_z))     # quaternion to euler
+                
+        # Save as y
+        self.y = np.array([eta_x, eta_y, self.psi])
+        self.y = np.resize(self.y, (3,))
+
+
+    def tauCallback(self, msg):
+        self.tau = np.resize(msg.data[:3], (3,))
+
+    def publish(self):
+        """
+            Publishes the observer estimates.
+        """
+        # update message
+        self.observer_msg.data[9:15] = self.nlpo.xi
+        self.observer_msg.data[0:3] = self.nlpo.eta
+        self.observer_msg.data[6:9] = self.nlpo.bias
+        self.observer_msg.data[3:6] = self.nlpo.nu
+
+        # publish message
+        self.pub.publish(self.observer_msg)
+
+    def update(self):
+        self.y, self.tau = np.asarray(self.y), np.asarray(self.tau)
+
+        self.nlpo.update(self.y, self.tau)
+
+
+if __name__ == '__main__':
+    vessel_name = "CSAD"
+    rospy.init_node(f"{vessel_name}_nlpo")
+    rospy.loginfo(
+        f"INITIALIZING {vessel_name} NON LINEAR PASSIVE OBSERVER NODE")
+    r = rospy.Rate(100)
+    dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
+
+    # Initialize observer
+    observer = Observer(dt, Tp=1e4)
+
+    while not rospy.is_shutdown():
+
+        observer.update()
+
+        observer.publish()
+
+        r.sleep()
+
+    rospy.spin()

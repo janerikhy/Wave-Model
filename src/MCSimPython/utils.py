@@ -24,6 +24,9 @@ import json
 from scipy.signal import TransferFunction
 from scipy.optimize import least_squares
 
+from scipy.signal import TransferFunction
+from scipy.optimize import least_squares
+
 
 dof3_matrix_mask = np.ix_([0, 1, 5], [0, 1 ,5])
 dof3_array = np.ix_([0, 1, 5])
@@ -1315,6 +1318,35 @@ def quat2eul(w, x, y, z):
     eps = q[1:]
 
     S = Smat(eps)
+
+    R = np.eye(3) + 2 * eta * S + 2 * np.linalg.matrix_power(S, 2)
+
+    if np.abs(R[2, 0]) > 1.0:
+        raise RuntimeError('Solution is singular for pitch of +- 90 degrees')
+
+    roll = np.arctan2(R[2, 1], R[2, 2])
+    pitch = -np.arcsin(R[2, 0])
+    yaw = np.arctan2(R[1, 0], R[0, 0])
+
+    return np.array([roll, pitch, yaw])
+
+
+def quat2eul(w, x, y, z):
+    """
+    Returns the ZYX roll-pitch-yaw angles from a quaternion.
+    """
+    q = np.array((w, x, y, z))
+    #if np.abs(np.linalg.norm(q) - 1) > 1e-6:
+    #   raise RuntimeError('Norm of the quaternion must be equal to 1')
+
+    eta = q[0]
+    eps = q[1:]
+
+    S = np.array([
+        [0, -eps[2], eps[1]],
+        [eps[2], 0, -eps[0]],
+        [-eps[1], eps[0], 0]
+    ])
 
     R = np.eye(3) + 2 * eta * S + 2 * np.linalg.matrix_power(S, 2)
 

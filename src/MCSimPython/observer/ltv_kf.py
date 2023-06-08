@@ -114,7 +114,7 @@ class LTVKF():
         self._Bd[12:15, 0:3] = self._Minv * self._dt
 
         self._Ed = np.zeros((15,6))
-        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt, np.eye(3)*self._dt
+        self._Ed[3:6,0:3], self._Ed[9:12,3:6] = np.diag([1,1,1])*self._dt, np.eye(3)*self._dt   # Multipliy with .01
 
         self._H = np.zeros((3,15))
         self._H[0:3,3:6], self._H[0:3,6:9] = np.eye(3), np.eye(3)
@@ -137,6 +137,9 @@ class LTVKF():
             self.update_async(tau, y, psi_m)
             return None
         
+        y, tau = np.asarray(y), np.asarray(tau) # ROS check
+
+
         # Correct
         self.corrector(y, dead_reckoning)
         # Predict        
@@ -151,6 +154,8 @@ class LTVKF():
     def predictor(self, tau, psi_m):
         Ad =  self.Ad(psi_m)   # Get the time-varying state matrix
 
+        tau = tau.reshape((3,)) # ROS check
+
         self.xbar = Ad@self.xhat + self._Bd@tau
         self.Pbar = Ad@self.Phat@Ad.T + self._Ed@self.Qd@self._Ed.T
 
@@ -161,9 +166,12 @@ class LTVKF():
             self.xhat = self.xbar
         else:
             K = self.KF_gain
+            y = y.reshape((3,)) # ROS check
+
             prediction_error = y - (self._H@self.xbar)
             prediction_error[2] = pipi(prediction_error[2])   # Smallest signed angle modification
 
+            
             parenthesis = np.eye(15) - K @ self._H
 
             self.Phat = parenthesis @ self.Pbar @ parenthesis.T + K @ self.Rd @ K.T

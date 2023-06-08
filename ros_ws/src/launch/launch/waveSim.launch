@@ -1,0 +1,4 @@
+<launch>
+    <node name="simulator" pkg = "simulator" type="csad" output="screen" />
+    <node name="observer" pkg = "observer" type="smallGain" output="screen"/>
+</launch>

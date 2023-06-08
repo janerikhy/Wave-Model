@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+import rospy
+import math
+from std_msgs.msg import Float64MultiArray, Bool, Int64
+from nav_msgs.msg import Odometry
+from MCSimPython.observer.ltv_kf import LTVKF
+from MCSimPython.simulator.csad import CSAD_DP_6DOF
+import numpy as np
+
+
+import sys
+sys.path.append(r'/home/hydrolab/dev/Wave-Model/')
+import src.MCSimPython.observer.ltv_kf as ltv
+from src.MCSimPython.utils import quat2eul
+
+
+class Observer(object):
+    def __init__(self, dt=0.01, Tp=1) -> None:
+        self.dt = dt
+
+        # Initilize vessel
+        self.vessel = CSAD_DP_6DOF(dt)
+
+        # Initilize filter
+        self.kalman_filter = ltv.LTVKF(dt, self.vessel._M, self.vessel._D, Tp)
+        self.kalman_filter.set_tuning_matrices(np.array([
+                [1e-2,0,0,0,0,0],
+                [0,1e-2,0,0,0,0],
+                [0,0,1e-4*np.pi/180,0,0,0],
+                [0,0,0,5e1,0,0],
+                [0,0,0,0,5e2,0],
+                [0,0,0,0,0,1e2]]), np.array([
+                [5e-4,0,0],
+                [0,5e-5,0],
+                [0,0,1e-3*np.pi/180]
+        ]) )
+        self.tau, self.y, self.y_prev = np.zeros(3), np.zeros(3), np.ones(3)
+
+        self.psi = 0.0
+
+        self.dead_reckoning = False
+        
+
+        # Publishers and subscribers
+        self.pub = rospy.Publisher(
+            f"/{vessel_name}/observer_states", Float64MultiArray, queue_size=1)         # publishing estimated pos, vel, bias and wave
+        self.subTau = rospy.Subscriber(
+            f"/{vessel_name}/tau", Float64MultiArray, self.tauCallback, queue_size=1)   # subscribing to actual thruster force
+        #self.odom_sub = rospy.Subscriber(
+        #    f"/qualisys/{vessel_name}/odom", Odometry, self.odomCallback, queue_size=1)
+        self.odom2_sub = rospy.Subscriber(
+            f"/{vessel_name}/measurements", Float64MultiArray, self.odom2Callback, queue_size=1)
+        self.dead_reck_sub = rospy.Subscriber(
+            f"/{vessel_name}/dead_reck", Bool, self.dead_reckCallback, queue_size=1)
+        
+        self.observer_msg = Float64MultiArray()
+
+    def update(self):
+        '''
+        Update the KF with self.y and self.tau
+        '''
+        # Make sure correct dimensions
+        self.y = np.asarray(self.y)
+        self.y = self.y.reshape((3,))   
+
+        # Dead reck test - *Not working yet*
+        #if np.array_equal(self.y, self.y_prev):
+        #    self.kalman_filter.deadReck = True
+
+        # Update
+        self.kalman_filter.update(self.tau, self.y, self.y[-1], dead_reckoning = self.dead_reckoning)
+        if self.dead_reckoning:
+            rospy.logwarn('Dead reckoning activated')
+
+
+    def odom2Callback(self, msg):
+        # Check timestamp on received topic
+
+        self.odom_2msg = msg
+
+        eta = msg.data[0:3]
+        nu = msg.data[3:6]
+        
+        self.y = eta
+        self.y = np.resize(self.y, (3,))
+
+
+    def dead_reckCallback(self, msg2):
+        self.dead_reckoning = True if msg2.data == True else False
+
+    '''
+    def odomCallback(self, msg):
+        """
+            Callback function for odometry message. Updating position and attitude of vessel.
+        """
+        self.y_prev = self.y
+
+        self.odom_msg = msg
+
+        # Position
+        eta_x = msg.pose.pose.position.x
+        eta_y = msg.pose.pose.position.y
+
+        # Quaternions (attitude)
+        q_w = msg.pose.pose.orientation.w
+        q_x = msg.pose.pose.orientation.x
+        q_y = msg.pose.pose.orientation.y
+        q_z = msg.pose.pose.orientation.z
+
+        euler_angles = quat2eul(q_w, q_x, q_y, q_z)
+        self.psi = pipi(euler_angles[0])                    # Edited to work with Qualisys
+
+        # Save as y 
+        self.y = np.array([eta_x, eta_y, self.psi])
+        self.y = np.resize(self.y, (3, 1))
+        # Rotate y to NED frame from basin frame
+        #self.rotate_y()
+     
+    
+    def rotate_y(self):
+        ''
+        Rotate the measurements from Qualisys ref.frame to NED
+        ''
+        self.y = Rx(np.pi)@self.y
+        self.y = np.array([self.y[0], self.y[1], self.y[2]])
+
+        # or 
+        # self.y = np.array([self.y[0], self.y[1], -self.y[2]])
+    '''
+
+    def tauCallback(self, msg):
+        '''
+        Callback function for tau message. Updating self.tau.
+        '''
+        self.tau = np.resize(msg.data[:3], (3,))
+
+    def publish(self):
+        """
+            Publishes the observer estimates.
+        """
+        # update message
+        self.observer_msg.data[9:15] = self.kalman_filter.get_x_hat()[0:6]
+        self.observer_msg.data[0:3] = self.kalman_filter.get_eta_hat()
+        self.observer_msg.data[6:9] = self.kalman_filter.get_bias()
+        self.observer_msg.data[3:6] = self.kalman_filter.get_nu_hat()
+        
+        # publish message
+        self.pub.publish(self.observer_msg)
+        
+
+if __name__ == '__main__':
+    vessel_name = "CSAD"
+    rospy.init_node(f"{vessel_name}_kf")
+    rospy.loginfo(f"INITIALIZING {vessel_name} KALMAN FILTERS NODE")
+    r = rospy.Rate(100)
+    dt = 0.01  # Simulation timestep corresponding to sampling frequency of 100 Hz
+    Tp = 0.7 # sea state 1           # 1e7
+
+    # Initilize ros node
+    observer = Observer(dt, Tp)
+
+    while not rospy.is_shutdown():
+        # Update
+        observer.update()
+        
+        # Publish message
+        observer.publish()
+
+        r.sleep()
+
+    rospy.spin()

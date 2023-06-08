@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+#from /home/hydrolab/dev/Wave-Model/src/MCSimPython/simulator/
+
+# spør jan om hvordan vi får tak i mc sim
+
 from MCSimPython.simulator.csad import CSADMan3DOF
 from MCSimPython.guidance.filter import ThrdOrderRefFilter
 from MCSimPython.control.basic import PD, PID
@@ -75,9 +79,10 @@ for i in range(1, len(t)):
 
 plt.figure(figsize=(6, 6))
 plt.axis("equal")
+plt.plot(xd[:, 1], xd[:, 0], 'r-', label="$\eta_d$")
 plt.plot(eta[:, 1], eta[:, 0], 'k-', label="PD")
 plt.plot(eta_pid[:, 1], eta_pid[:, 0], 'b--', label="PID")
-plt.plot(xd[:, 1], xd[:, 0], 'r-', label="$\eta_d$")
+#plt.plot(xd[:, 1], xd[:, 0], 'r-', label="$\eta_d$")
 plt.xlabel("E [m]")
 plt.ylabel("N [m]")
 plt.legend()
@@ -93,9 +98,10 @@ for i in range(3):
 fig, ax = plt.subplots(3, 1, sharex=True)
 for i in range(3):
     plt.sca(ax[i])
+    plt.plot(t, xd[:, i+3], label=r"$\nu_d$")
     plt.plot(t, nu[:, i], 'k-', label="PD")
     plt.plot(t, nu_pid[:, i], 'm--', label="PID")
-    plt.plot(t, xd[:, i+3], label=r"$\nu_d$")
+    #plt.plot(t, xd[:, i+3], label=r"$\nu_d$")
     plt.legend()
 
 plt.show()

@@ -1,0 +1,7 @@
+<launch>
+    <node name="simulator" pkg = "simulator" type="csad" output="screen" />
+    <node name="observer" pkg = "observer" type="kf" output="screen"/>
+    <node name="controller" pkg = "controller" type="fourier_series"  output="screen"/>
+    <node name="thrust_allocator" pkg = "thrust_allocator" type="fixed" output="screen" />
+    <node name="guidance" pkg = "guidance" type="filter" output="screen" />
+</launch>
