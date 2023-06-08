@@ -92,11 +92,11 @@ class AdaptiveFSController():
         alpha_dot = -(self._K1 + self._kappa*np.eye(3))@z1_dot - S@R.T@eta_d_dot + R.T@eta_d_ddot        
 
         # Adaptive update law
-        theta_hat_dot = self._gamma@Phi@z2                                                                  # @z1?
+        theta_hat_dot = self._gamma@Phi@z2                                                                 
         self.theta_hat  += (theta_hat_dot * self._dt)
 
         # Control law
-        tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat           # In body frame
+        tau = -self._K2@z2 + self._D@alpha + self._M@alpha_dot - Phi.T@self.theta_hat         
        
 
         # Calculate bias

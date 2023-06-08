@@ -368,15 +368,3 @@ class EKF():
     def get_nu_hat(self):
         return self._xhat[12:15] 
         
-
-'''
-"Tuning factors":
-    - Q and R
-    - Tp in A_w
-    - zeta in A_w
-    - diag(Kw,Kw,Kw) in E
-    - Eb in E (njæ)
-    - Adjustment of noise
-    - Time step
-    - Initial values
-'''

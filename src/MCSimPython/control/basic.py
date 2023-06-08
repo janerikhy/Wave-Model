@@ -66,7 +66,6 @@ class PID:
         self.Ki = np.diag(ki)
         self.zi = np.zeros(3)
         self.dt = dt
-        self.returnIntegral = returnIntegral
 
     def get_tau(self, eta, eta_d, nu, nu_d):
         """Calculate control loads.
