@@ -158,3 +158,5 @@ class AdaptiveFSController():
         self._gamma = np.diag(gamma)
 
 
+    def get_theta(self):
+        return self.theta_hat
