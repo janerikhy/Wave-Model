@@ -1,9 +1,11 @@
 # ltv_kf.py
 # ----------------------------------------------------------------------------
 # This code is part of the MCSimPython toolbox and repository.
-# Created By: Harald Mo
+# Created By:   Harald Mo
 # Created Date: 2023-05-03
-# 
+# Revised:      2023-05-09 Harald Mo        Added dead reckoning
+#
+#
 # Copyright (C) 2023: NTNU, Trondheim
 # Licensed under GPL-3.0-or-later
 # ---------------------------------------------------------------------------
@@ -159,7 +161,7 @@ class LTVKF():
 
     
     def corrector(self, y, dead_reckoning):
-        if dead_reckoning:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
+        if dead_reckoning:    # If dead reckoning: Set corrector equal to predictor (Dead reckoning)
             self.Phat = self.Pbar
             self.xhat = self.xbar
         else:

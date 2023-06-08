@@ -5,6 +5,8 @@
 # Created By: Jan-Erik Hygen
 # Created Date: 2023-01-30
 # Revised: 2023-02 - Added Direct Bias Compensation Controller - Harald Mo
+#          2023-05 - Added PI controller - Harald Mo
+#
 # Tested:
 # 
 # Copyright (C) 2023: NTNU, Trondheim
@@ -42,11 +44,8 @@ class PD:
             Controller load in surge, sway, and yaw (body-frame).
         """
         psi = eta[-1]
-
-        eta_tilde = eta-eta_d
-        eta_tilde[-1] = pipi(eta_tilde[-1])
-
-        z1 = Rz(psi).T@eta_tilde
+        z1 = Rz(psi).T@(eta-eta_d)
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d
         return -self.Kp@z1 - self.Kd@z2
     
@@ -61,16 +60,15 @@ class PD:
 class PID:
     """Proportional-Derivative control with integral action."""
     
-    def __init__(self, kp: list, kd: list, ki: list, dt: float = 0.01, integral_windup = False):
+    def __init__(self, kp: list, kd: list, ki: list, dt: float = 0.01):
         self.Kp = np.diag(kp)
         self.Kd = np.diag(kd)
         self.Ki = np.diag(ki)
         self.zi = np.zeros(3)
         self.dt = dt
 
-        self.tau_sat = .5
 
-    def get_tau(self, eta, eta_d, nu, nu_d, return_integral = False):
+    def get_tau(self, eta, eta_d, nu, nu_d):
         """Calculate control loads.
         
         Parameters
@@ -90,30 +88,19 @@ class PID:
             Controller load in surge, sway, and yaw (body-frame).
         """
         psi = eta[-1]
-
-        eta_tilde = eta-eta_d
-        eta_tilde[-1] = pipi(eta_tilde[-1])
-
-
-        z1 = Rz(psi).T@eta_tilde
+        z1 = Rz(psi).T@(eta - eta_d)
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d
 
-        self.zi += self.dt*eta_tilde
+        self.zi[:2] += self.dt*(eta[:2] - eta_d[:2])
+        self.zi[2] += self.dt*pipi(eta[2] - eta_d[2])
+        
+        return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
 
-        tau = -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
-        
-        # Integral windup
-        #if np.abs(tau) > self.tau_sat:  
-        #    self.zi -= self.dt*eta_tilde
-        #    return -self.Kp@z1 - self.Kd@z2 - Rz(psi).T@self.Ki@self.zi
-        if return_integral:
-            return tau, Rz(psi).T@self.Ki@self.zi
-        
-        return tau
-    
+
 class PI:
     """Proportional control with integral action."""
-    
+
     def __init__(self, kp: list, ki: list, dt: float = 0.01):
         self.Kp = np.diag(kp)
         self.Ki = np.diag(ki)
@@ -145,8 +132,7 @@ class PI:
         self.zi += self.dt*(eta_tilde)
 
         return -self.Kp@z1 - Rz(psi).T@self.Ki@self.zi
-
-
+    
 
 class DirectBiasCompensationController():
     '''
@@ -175,13 +161,10 @@ class DirectBiasCompensationController():
         Remark: Reference frame of bias!
         '''
         psi = eta[-1]
-
-        eta_tilde = eta-eta_d
-        eta_tilde[-1] = pipi(eta_tilde[-1])
-
-        z1 = Rz(psi).T@eta_tilde                # P
+        z1 = Rz(psi).T@(eta-eta_d)              # P
+        z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d                          # D
-        zb = Rz(psi).T@b                        # bias
+        zb = Rz(psi).T@b                        # bias in body
         return -self.Kp@z1 - self.Kd@z2 - zb
     
     def set_kd(self, kd: list):

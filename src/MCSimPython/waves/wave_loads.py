@@ -17,7 +17,10 @@
 import numpy as np
 from scipy.interpolate import interp1d
 import json
-from MCSimPython.utils import to_positive_angle, pipi
+from MCSimPython.utils import to_positive_angle, pipi, timeit
+
+import os
+
 
 class WaveLoad:
     """Class for computation of wave loads on floating structure. Both 
@@ -239,7 +242,8 @@ class WaveLoad:
         rel_angle = np.mean(self._relative_incident_angle(heading))
 
         # Get the QTF matrix for the given heading for each DOF.
-        heading_index = np.argmin(np.abs(self._qtf_angles - rel_angle))
+        qtf_angles = np.linspace(0, 2*np.pi, 360)
+        heading_index = np.argmin(np.abs(qtf_angles - rel_angle))
         Q = self._Q[:, heading_index, :, :]
         # print(Q.shape)
 
@@ -311,6 +315,7 @@ class WaveLoad:
                 angles_1deg = np.linspace(0, 2*np.pi, 360)
                 f_qdiag_beta = interp1d(qtf_headings, Qdiag, axis=2, bounds_error=False, fill_value=(Qdiag[:, :, 0], Qdiag[:, :, -1]))
                 Qdiag = f_qdiag_beta(angles_1deg)
+                # self._qtf_angles = angles_1deg
             Q = np.zeros((6, Qdiag.shape[2], self._N, self._N))
             for dof in range(6):
                 for i in range(Qdiag.shape[2]):
@@ -373,7 +378,6 @@ class WaveLoad:
                 diff = np.abs(k_old - k_new)
                 count += 1
             k[i] = k_new
-            print(count)
         return k
 
     def _relative_incident_angle(self, heading):
@@ -417,3 +421,82 @@ class WaveLoad:
     @classmethod
     def get_methods(cls):
         return cls.QTF_METHODS
+
+
+
+class FluidMemory:
+
+    def __init__(self, dt, config_file, vessel_name):
+        self.dt = dt
+        self.config_file = config_file
+        self.vessel_name = vessel_name
+        self.vessel_data = self._load_data()
+
+        # Extract matrices from system identification
+        self._Ar_lst = self.vessel_data['Ar']   # List of system matrices
+        self._Br_lst = self.vessel_data['Br']   # List of input matrices
+        self._Cr_lst = self.vessel_data['Cr']   # List of output matrices
+
+        self._xr, self._Ar, self._Br, self._Cr, self.indices = self._set_ss_model()
+        self.n_systems = len(self._xr)
+
+        self.mu = np.zeros(6)
+        
+
+    @property
+    def mu(self):
+        return self._mu
+    
+    @mu.setter
+    def mu(self, array):
+        tau = np.asarray_chkfinite(array)
+        if tau.shape[0] != 6:
+            print("ValueError")
+        self._mu = array
+    
+    def _load_data(self):
+        print("Load Vessel data")
+        # Load vessel data from configuration file.
+        try:
+            with open(self.config_file, 'r') as cf:
+                vessel_data = json.load(cf)
+        except FileNotFoundError:
+            print(f"Could not find the file: {self.config_file}.")
+
+            new_path = os.path.abspath(os.path.join(
+                os.path.dirname(__file__),
+                os.pardir,
+                'vessel_data',
+                self.vessel_name,
+                self.config_file
+            ))
+            print(f"Trying file at: {new_path}")
+            with open(new_path, 'r') as cf:
+                vessel_data = json.load(cf)
+
+        return vessel_data
+
+    def _set_ss_model(self):
+        dimensions = [np.asarray(ar_i).shape for ar_i in self._Ar_lst]
+        xr = [np.zeros(dim[0]) for dim in dimensions if len(dim) > 1]
+        indices = [i for i, dim in enumerate(dimensions) if len(dim) > 1]
+        Ar = [np.asarray(self._Ar_lst[ind]) for ind in indices]
+        Br = [np.asarray(self._Br_lst[ind]).reshape(-1,) for ind in indices]
+        Cr = [np.asarray(self._Cr_lst[ind]) for ind in indices]
+        return xr, Ar, Br, Cr, indices
+    
+    
+    def integrate(self, nu):
+        yr = np.zeros(6)
+        for i, indices in enumerate(self.indices):
+            dof = indices//6
+            xr_dot = self._Ar[i]@self._xr[i] + self._Br[i]*nu[indices%6]
+            self._xr[i] = self._xr[i] + self.dt * xr_dot
+            yr[dof] += self._Cr[i]@self._xr[i]
+        self.mu = yr
+        
+    def reset(self):
+        for i in range(len(self.indices)):
+            self._xr[i] = np.zeros_like(self._xr[i])
+        self.mu = np.zeros(6)
+        

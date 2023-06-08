@@ -36,12 +36,12 @@ Demonstration of how the individual components of the python package can be used
 ## Visualization
 
 ### RVG 6DOF model in beam sea
-![6DOF RVG 2D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/wave_motion1d.gif)
+![6DOF RVG 2D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d__rvg_waveangle_90.gif)
 
-### RVG 6DOF model in multidirectional sea
-![6DOF RVG 3D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d__rvg2.gif)
+### RVG 6DOF model in head sea
+![6DOF RVG 3D Visualization](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d__rvg_waveangle_180.gif)
 
-
+<!---
 ### CSAD 6DOF model in multidirectional sea
 ![6DOF CSAD 2D Visualisation](https://github.com/janerikhy/Wave-Model/blob/main/demos/animations/vessel_motion3d_22.gif)
-
+--->
