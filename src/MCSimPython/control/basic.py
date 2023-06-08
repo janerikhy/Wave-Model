@@ -128,7 +128,7 @@ class DirectBiasCompensationController():
         z1 = Rz(psi).T@(eta-eta_d)              # P
         z1[2] = pipi(eta[2] - eta_d[2])
         z2 = nu - nu_d                          # D
-        zb = Rz(psi).T@b                        # bias
+        zb = Rz(psi).T@b                        # bias in body
         return -self.Kp@z1 - self.Kd@z2 - zb
     
     def set_kd(self, kd: list):
