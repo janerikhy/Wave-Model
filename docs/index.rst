@@ -19,7 +19,7 @@ Welcome to MC Sim Python's documentation!
 
 The ``MCSimPython`` package is developed as a part of the master thesis of M. Kongshaug, H. Mo, and J. Hygen, at the
 `Department of Marine Technology (NTNU, Trondheim) <https://www.ntnu.edu/imt>`_. The package is used for simulation of DP stationkeeping models and
-manuevering models. 
+manuevering models subject to first- and second order wave loads. 
 
 .. toctree::
    :maxdepth: 1
@@ -32,6 +32,7 @@ manuevering models.
    modules/thrust_allocation
    modules/observer
    modules/waves
+   modules/utils
 
 .. toctree::
    :maxdepth: 2

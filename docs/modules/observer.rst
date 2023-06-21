@@ -14,4 +14,5 @@ Nonlinear Observers
 Kalman Filters
 --------------
 
-Documentation will be updated in later versions.
+.. autoclass:: MCSimPython.observer.ekf.EKF
+    :members:

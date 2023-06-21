@@ -158,7 +158,10 @@ class DirectBiasCompensationController():
         b : array_like
             Estimated bias in surge, sway and yaw (body-frame)
 
-        Remark: Reference frame of bias!
+        Note
+        ----
+        The bias term `b` is defined in body-frame.
+        
         '''
         psi = eta[-1]
         z1 = Rz(psi).T@(eta-eta_d)              # P

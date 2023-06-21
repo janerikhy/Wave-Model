@@ -4,6 +4,9 @@ Simulator
 Base Vessel
 -----------
 
+The `Vessel` class works as an abstract base class for all vessel models. All subclasses of  `Vessel` inherits
+the mehtods of `Vessel`.
+
 .. autoclass:: MCSimPython.simulator.vessel.Vessel
     :members:
 

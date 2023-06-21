@@ -172,13 +172,24 @@ def to_positive_angle(theta):
 
 
 def pipi2cont(psi, psi_prev):
-    """Lifting algorithm."""
+    """Lifting algorithm for angle signal. """
     arr = np.array([psi_prev, psi])
     return np.unwrap(arr)[-1]
 
 
 def Rx(phi):
-    """3DOF Rotation matrix about x-axis."""
+    """3DOF Rotation matrix about x-axis.
+    
+    Parameters
+    ----------
+    phi : float
+        Roll angle (rad).
+    
+    Returns
+    -------
+    Rx : array_like
+        3x3 rotation matrix. 
+    """
     return np.array([
         [1, 0, 0],
         [0, np.cos(phi), -np.sin(phi)],
@@ -187,7 +198,19 @@ def Rx(phi):
 
 
 def Ry(theta):
-    """3DOF Rotation matrix about y-axis."""
+    """3DOF Rotation matrix about y-axis.
+    
+    Parameters
+    ----------
+    theta : float
+        Pitch angle (rad)
+    
+    Returns
+    -------
+    Ry : array_like
+        3x3 rotation matrix.
+    
+    """
     return np.array([
         [np.cos(theta), 0, np.sin(theta)],
         [0, 1, 0],
@@ -196,7 +219,19 @@ def Ry(theta):
 
 
 def Rz(psi):
-    """3DOF Rotation matrix about z-axis."""
+    """3DOF Rotation matrix about z-axis.
+    
+    Parameters
+    ----------
+    psi : float
+        Yaw angle (rad)
+    
+    Returns
+    -------
+    Rz : array_like
+        3x3 rotation matrix.
+    
+    """
     return np.array([
         [np.cos(psi), -np.sin(psi), 0],
         [np.sin(psi), np.cos(psi), 0],
@@ -205,7 +240,22 @@ def Rz(psi):
 
 
 def Rzyx(eta):
-    """Full roation matrix."""
+    """Full roation matrix.
+    
+    .. math::
+        R_{zyx} = R_z(\psi)R_y(\\theta)R_x(\phi)
+    
+    
+    Parameters
+    ----------
+    eta : array_like
+        6x1 array of vessel pose in NED frame.
+        
+    Returns
+    -------
+    Rzyx : array_like
+
+    """
     phi = eta[3]
     theta = eta[4]
     psi = eta[5]
@@ -213,6 +263,23 @@ def Rzyx(eta):
 
 
 def Tzyx(eta):
+    """Transformation matrix. 
+    
+    Parameters
+    ----------
+    eta : array_like
+        6x1 vessel pose vector in NED frame.
+        
+    Returns
+    -------
+    Tzyx : array_like
+        3x3 transformation matrix
+        
+    See Also
+    --------
+    MCSimPython.utils.J
+        
+    """
     phi = eta[3]
     theta = eta[4]
     psi = eta[5]
@@ -224,7 +291,22 @@ def Tzyx(eta):
 
 
 def J(eta):
-    """6 DOF rotation matrix."""
+    """6 DOF rotation matrix.
+    
+    .. math::
+        J(\eta) = \left[\\begin{array}{cc}R_{zyx}(\eta) & O_{3\\times 3} \\\ O_{3\\times 3} & T_{zyx}(\eta)\end{array} \\right]
+    
+    Parameters
+    ----------
+    eta : array_like
+        6x1 vessel pose vector in NED frame
+        
+    Returns
+    -------
+    J : array_like
+        6x6 rotation matrix.
+    
+    """
     phi = eta[3]
     theta = eta[4]
     psi = eta[5]
@@ -347,7 +429,9 @@ def rigid_body_transform(r, eta, in_ned=True):
     The calculation assumes small angles (s.t. cos(theta)=0 and sin(theta)=theta)
     and is computed as:
 
-    ``s = (\eta_1, \eta_2, \eta_3)^T + (\eta_4, \eta_5, \eta_6) x (r_x, r_y, r_z)``
+    .. math::
+        s = (\eta_1, \eta_2, \eta_3)^T + (\eta_4, \eta_5, \eta_6) x (r_x, r_y, r_z)
+    
     
     Parameters
     ----------

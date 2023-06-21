@@ -21,13 +21,10 @@ from MCSimPython.utils import Rz, pipi, six2threeDOF
 class EKF():
     '''
     Implementation of Extended Kalman Filter (EKF) for CSAD.
-
-    x_hat = [
-        zeta    (6DOF)
-        eta     (3DOF)
-        bias    (3DOF)
-        nu      (3DOF)
-    ]
+    
+    .. math::
+        \hat{x} = \left[ \\begin{array}{c} \zeta \\\ \eta\\\ b  \\\ \\nu \end{array} \\right]\;\;
+        \zeta \in \mathbb{R}^6\; \eta, \\nu, b \in \mathbb{R}^3
 
     Reference:
         - Fossen (2021), Marine craft hydrodynamics and motion control, ch 13.
@@ -38,10 +35,14 @@ class EKF():
 
         Parameters
         -----------
-            - dt (float): Time step
-            - M (numpy array (6, 6)): Inertia matrix of system (including added mass) 6DOF
-            - D (numpy array (6, 6)): Full damping matrix of system 6DOF
-            - Tp (int): Peak period of wave spectre
+        dt : float
+            Time step
+        M : array_like
+            Inertia matrix of system (including added mass) 6DOF
+        D : array_like
+            Full damping matrix of system 6DOF
+        Tp : float
+            Peak period of wave spectre
         '''
         self._dt = dt
 
@@ -88,11 +89,13 @@ class EKF():
 
         Parameters
         ----------
-            - tau: Control Parameters (3DOF)
-            - y: Measured position (3DOF)
+        tau : array_like
+            Control Parameters (3DOF)
+        y : array_like
+            Measured position (3DOF)
 
-        To be implemented / Improvements
-        -----------
+        To be implemented
+        -----------------
             - Error checks?
             - Asynchronous measurements?
             - Set y to nan if no measurement
@@ -111,7 +114,8 @@ class EKF():
         
         Parameters
         ----------
-            - tau = [X, Y, N]',  Control input (3DOF)
+        tau : array_like
+            Control input (3DOF) [X, Y, N]
              
         '''
         phi = self.state_function_jacobian()
@@ -128,12 +132,12 @@ class EKF():
 
         Parameters
         -----------
-            - y = [eta1  eta2  eta6]', Measurements (3DOF) 
+        y : array_like
+            Measurements (3DOF) 
 
-        To be implemented / Improvements
-        ----------
-            - Check if measurement is given. Can also be made with modulus operator if measurement freq is different from dt.
-            - 
+        To be implemented
+        -----------------
+        Check if measurement is given. Can also be made with modulus operator if measurement freq is different from dt.
         '''
 
         if np.any(np.isnan(y)) == True:    # If no new measurements: Set corrector equal to predictor (Dead reckoning)
@@ -157,13 +161,10 @@ class EKF():
         Kalman gain:
         Used to balance the contributions of the predicted state estimate and the measurement data in the updated estimate.
 
-        Parameters
-        -----------
-            - N/A
-
-        Output
-        -----------
-            - K: Kalman gain (Dim = 15x3)
+        Returns
+        -------
+        K : array_like
+            Kalman gain (dim = 15x3)
         '''
         parenthesis = self._H@self._Pbar@(self._H.T) + self._Rd
         K = self._Pbar@(self._H.T)@np.linalg.inv(parenthesis)
@@ -171,26 +172,32 @@ class EKF():
 
 
     def state_function(self, x, tau, noise = np.zeros(6)):                    # f(x,u,w)
-        '''
-        x_dot = A(x) + B*tau + E*w      = f(x,u,w)
+        """State function
+        
+        .. math::
+            \dot{x} = A(x) + B\\tau + Ew = f(x, u, w),
+            
+             A(x) =\left[\\begin{array}A_w \\xi \\\ 
+                R_z(\psi)\\nu \\\ 0_{3\\times 1} \\\ 
+                -M^{-1}D\\nu + M^{-1}R_z{\psi}^{\\top} b 
+            \end{array}\\right] 
 
-        where A(x) = [
-            Aw * xi
-            R(psi) * nu
-            0_(3x1)
-            -M_inv*D * nu + M_inv*R(psi).T * b
-        ]
 
         Parameters
         ----------
-            - x: state vector (Dim = 15)
-            - tau: Control vector [X  Y  N]
-            - noise: Modelled white noise, set to zero in a deterministic EKF. (Dim=6)
+        x : array_like
+            State vector (Dim = 15)
+        tau : array_like
+            Control vector [X  Y  N]
+        noise : array_like
+            Modelled white noise, set to zero in a deterministic EKF. (Dim=6)
 
-        Output
-        ----------
-            - f: x_dot (Dim = 15)
-        '''
+        Returns
+        -------
+        f : array_like
+            x_dot (Dim = 15)
+        
+        """
         xi = x[0:6]
         eta = x[6:9]
         psi = eta[2]
@@ -218,20 +225,19 @@ class EKF():
 
         where
 
-        del(f)/del(x) = [
-            row (1):        A_w         0_(6x3)     0_(6x3)         0_(6x3)                 
-            row (2):        0_(3x6)     del_f2      0_(3x3)         R(psi)                  
-            row (3):        0_(3x6)     0_(3x3)     0_(3x3)         0_(3x3)                
-            row (4):        0_(3x6)     del_f4      M_inv*R(psi).T  -M_inv*D                
-        ]   
+        .. math::
 
-        Parameters
-        ----------
-            - N/A
+            \\frac{\partial{f}}{\partial{x}} = \left[\\begin{array}{cccc}
+                A_w  & 0_(6x3) & 0_(6x3) & 0_(6x3) \\\                 
+                0_(3x6)  & \partial{f_2}  & 0_(3x3)  &  R(psi) \\\                 
+                0_(3x6)  & 0_(3x3) &  0_(3x3)  &  0_(3x3) \\\                
+                0_(3x6)  &   \partial{f_4} &  M^{-1}R(\psi)^\\top & -M^{-1}D                
+            \end{array}\\right]   
 
-        Output
-        -----------
-            - phi: Discretized jacobian of system dynamics (Dim = 15x15)
+        Returns
+        -------
+        phi : array_like
+            Discretized jacobian of system dynamics (Dim = 15x15)
 
         '''
         # Extract states
@@ -267,36 +273,36 @@ class EKF():
         '''
         Initialize following matrices:
 
-        A_w = [
-            0_(3x3)     I_3
-            -omega^2    -2*zeta*omega
-        ]
 
-        E = [
-            0_(3x3)     0_(3x3)
-            E_w         0_(3x3)
-            0_(3x3)     0_(3x3)
-            0_(3x3)     E_b
-            0_(3x3)     0_(3x3)
-        ]
+        .. math::
+            A_w = \left[ \\begin{array}{cc}
+                0_{3x3}  &  I_{3x3} \\\ 
+                -\omega^2  &  -2\zeta\omega 
+            \end{array}\\right]
 
-        gamma = dt * E
+            E = \left[\\begin{array}{cc}
+                0_{3x3}  &  0_{3x3} \\\ 
+                E_w  &   0_{3x3} \\\ 
+                0_{3x3}  &   0_{3x3} \\\ 
+                0_{3x3}  &   E_b     \\\ 
+                0_{3x3}  &   0_{3x3} \\\ 
+            \end{array} \\right]
 
-        H = [
-            0_(3x3)     I_3     I_3     0_(3x6)
-        ]
+            \gamma = \Delta t  E
 
-        B = [
-            0_(12x3)
-            M_inv
-        ]
+            H = \left[ \\begin{array}0_{3x3}  &   I_{3x3}  &   I_{3x3}  &   0_{3x6} \end{array} \\right]
+
+            B = \left[\\begin{array}0_{12x3} \\\ 
+                M^{-1} \\\ 
+            \end{array} \\right]
 
         Parameters
         ----------
-            - Tp: Sea state peak period
+        Tp : float
+            Sea state peak period
 
-        To be implemented / Improvements
-        ----------
+        To be implemented
+        -----------------
             - Tuning must be done
             - Can add wave spectrum properties as input in tuning? Tp, Damping, Kw_i
             - Use np.block() in _Aw

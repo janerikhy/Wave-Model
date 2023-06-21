@@ -1,21 +1,18 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-#from /home/hydrolab/dev/Wave-Model/src/MCSimPython/simulator/
-
-# spør jan om hvordan vi får tak i mc sim
-
 from MCSimPython.simulator.csad import CSADMan3DOF
 from MCSimPython.guidance.filter import ThrdOrderRefFilter
 from MCSimPython.control.basic import PD, PID
 from MCSimPython.utils import Rz
 
-plt.rcParams.update({
-    'figure.figsize': (8, 6),
-    'font.size': 12,
-    'font.family': 'serif',
-    'axes.grid': True
-})
+
+# plt.rcParams.update({
+#     'figure.figsize': (8, 6),
+#     'font.size': 12,
+#     'font.family': 'serif',
+#     'axes.grid': True
+# })
 
 # Simulation parameters
 simtime = 800
