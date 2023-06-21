@@ -34,6 +34,11 @@ A larger number of wave components must be used for longer simulations.
     _, wave_spectrum = jonswap(hs=hs, tp=tp, gamma=gamma)
 
 
+
+.. image:: ../imgs/wave_spectrum.png
+    :width: 600
+    :alt: Wave Spectrum Image
+
 Having defined the wave spectrum, we can compute the wave amplitudes using the simple relation:
 
 .. math::
