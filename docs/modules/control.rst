@@ -21,6 +21,25 @@ PID Controller
 .. autoclass:: MCSimPython.control.basic.PID
     :members:
 
+PI Controller
+^^^^^^^^^^^^^
+
+.. autoclass:: MCSimPython.control.basic.PI
+    :members:
+
+
+Direct Bias Compensation Controller
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoclass:: MCSimPython.control.basic.DirectBiasCompensationController
+    :members:
+
+
+Adaptive Controller
+-------------------
+
+.. autoclass:: MCSimPython.control.adaptiveFS.AdaptiveFSController
+    :members:
 
 Backstepping Controllers
 ------------------------

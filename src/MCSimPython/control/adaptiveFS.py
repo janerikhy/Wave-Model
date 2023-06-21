@@ -11,18 +11,20 @@ class AdaptiveFSController():
     
     To be implemented:
         - Improved tuning.
-        - 
     '''
     def __init__(self, dt, M, D, N=15):
-        '''
-        Initialize
+        '''Initialize
 
         Parameters
         ------------
-            - dt: timestep
-            - M: Mass-matrix (6x6) of vessel (inertia + added mass)
-            - D: Full damping matrix (6x6) of vessel
-            - N: Number of wave frequency components. Set to 15 as default
+        dt : float
+            timestep
+        M : array_like
+            Mass-matrix (6x6) of vessel (inertia + added mass)
+        D : array_like
+            Full damping matrix (6x6) of vessel
+        N : int
+            Number of wave frequency components. Set to 15 as default
         '''
         self._dt = dt
         self._M = six2threeDOF(M)
@@ -44,18 +46,24 @@ class AdaptiveFSController():
 
 
     def get_tau(self, eta, eta_d, nu, eta_d_dot, eta_d_ddot, t, calculate_bias=False):
-        '''
-        Calculate controller output based on the adaptive update law. 
+        '''Calculate controller output based on the adaptive update law. 
 
         Parameters
         -----------
-            - eta (3DOF): [surge, sway, yaw] expressed in NED
-            - eta_d (3DOF): Desired position expressed in NED
-            - nu (3DOF): [u, v, r] expressed in body
-            - eta_d_dot (3DOF): Desired velocity expressed in NED
-            - eta_d_ddot (3DOF): Desired acceleration expressed in NED
-            - t (float): Time
-            - Calculate_bias (bool): Function will also return estimated bias if True. Set to False as default.
+        eta : array_like
+            [surge, sway, yaw] expressed in NED
+        eta_d : array_like
+            Desired position expressed in NED
+        nu : array_like
+            [u, v, r] expressed in body
+        eta_d_dot : array_like
+            Desired velocity expressed in NED
+        eta_d_ddot : array_like
+            Desired acceleration expressed in NED
+        t : float
+            Time
+        Calculate_bias : bool
+            Function will also return estimated bias if True. Set to False as default.
 
         Output
         ------------
@@ -110,18 +118,18 @@ class AdaptiveFSController():
         return tau
 
     def get_regressor(self, t):
-        '''
-        get_regressor:
-        Extract a (2*N+1)-dimensional regressor defined as [1   cos(w1*t)   sin(w1*t)   cos(w2*t)   ...   sin(wN*t)].
+        '''Extract a (2*N+1)-dimensional regressor defined as [1   cos(w1*t)   sin(w1*t)   cos(w2*t)   ...   sin(wN*t)].
         Used in get_tau() to calculate control forces.
 
         Parameters
         ----------
-            - t: time (float)
+        t : float
+            Time
 
         Return
         ----------
-            - regressor: (2N + 1)-dim, time-dependent vector as defined above
+        regressor : array_like
+            (2N + 1) dimensional, time-dependent vector as defined above
         '''
         regressor = np.zeros(2*self._N + 1)
         regressor[0] = 1
@@ -132,17 +140,18 @@ class AdaptiveFSController():
 
     
     def set_freqs(self, w_min, w_max, N):
-        '''
-        set_freqs:
-        Customize the number and magnitude of wave frequencies to be included in the internal disturbance model.
+        '''Customize the number and magnitude of wave frequencies to be included in the internal disturbance model.
 
         UNIT IN RAD/S OR HZ?
 
         Parameters
         -----------
-            - w_min: Lower bound frequency
-            - w_max: Upper bound frequency
-            - N: Number of components
+        w_min : float
+            Lower bound frequency
+        w_max : float
+            Upper bound frequency
+        N : int
+            Number of components
         '''
         self._N = N
         try:

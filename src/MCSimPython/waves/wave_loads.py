@@ -287,7 +287,7 @@ class WaveLoad:
         Q : 6 x M x N x N array
             Approximated full QTF for 6 DOF, M headings and N wave frequencies.
 
-        See also
+        See Also
         --------
         WaveLoad.get_methods()
         WaveLoad.QTF_METHODS

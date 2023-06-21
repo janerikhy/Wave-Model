@@ -8,6 +8,9 @@ on the vessel. Here, laods refer to the first- and second-order wave loads.
 We will in this tutorial show how to create a sea state, and how to use it to simulate a vessel subject to wave loads.
 
 First, we will generate a sea state with 100 wave components. We will in this example use the ``JONSWAP`` wave spectra.
+The number of wave components should be selected based on the simulation time and the time step used.
+A larger number of wave components must be used for longer simulations. 
+
 
 .. code-block:: python
 
@@ -28,13 +31,13 @@ First, we will generate a sea state with 100 wave components. We will in this ex
 
     jonswap = JONSWAP(wave_freqs)
 
-    _, wave_spectra = jonswap(hs=hs, tp=tp, gamma=gamma)
+    _, wave_spectrum = jonswap(hs=hs, tp=tp, gamma=gamma)
 
 
-Having defined the wave spectra, we can use compute the wave amplitudes using the simple relation:
+Having defined the wave spectrum, we can compute the wave amplitudes using the simple relation:
 
 .. math::
-    \zeta_a = \sqrt{2S(\omega)d\omega}.
+    \zeta_{a,i} = \sqrt{2S(\omega_i)d\omega}.
 
 We will define a set of random phases (representing the random phase difference between each wave) and 
 define a set of wave angles. In this example, we will model long-crested sea (unidirectional waves). The
@@ -66,7 +69,7 @@ we are using the RV Gunnerus 6 DOF simulation model.
     waveload = WaveLoad(
         amps=wave_amps,
         freqs=wave_freqs,
-        eps=phase,
+        eps=rand_phase,
         angles=wave_angles,
         config_file=vessel._config_file,
         interpolate=True,

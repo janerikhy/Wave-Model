@@ -1,21 +1,7 @@
 Thrust Allocation
 =================
 
-
-Thruster
---------
-
-.. automodule:: MCSimPython.thrust_allocation.thruster
+The thrust allocation module is currently not implemented.
 
 
-Constraints
------------
-
-.. automodule:: MCSimPython.thrust_allocation.constraints
-
-
-Allocation
-----------
-
-.. automodule:: MCSimPython.thrust_allocation.allocation
 
